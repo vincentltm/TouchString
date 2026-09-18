@@ -20,7 +20,8 @@ _trans_mult           { 1.f },
 _is_mono              { false },
 _mono_stack_size      { 0 },
 _current_oct_mult     { 1.f },
-_is_dampen_active     { false }
+_is_dampen_active     { false },
+_dampen_pressure      { 0.f }
 {
   _mono_stack.fill(0);
   _voice_oct_mult.fill(1.f);
@@ -105,12 +106,16 @@ void String::SetTransp(const float value) {
 
 void String::SetDampenPad(const bool active, const float pressure) {
   _is_dampen_active = active;
+  _dampen_pressure = active ? pressure : 0.0f;
   if (active) {
-    float eff_damping = daisysp::fclamp(0.65f + 0.30f * pressure, 0.0f, 0.98f);
+    // In FastString: damping_ = 0.0 is dead muted (immediate decay), 1.0 is infinite sustain.
+    // Squeezing P01 chokes the acoustic string decay down towards zero (palm mute).
+    float choke = daisysp::fclamp(1.0f - 1.25f * pressure, 0.001f, 1.0f);
+    float eff_damping = _damping * choke;
     for (auto& v : _vox) {
-      v.SetDamping(std::max(_damping, eff_damping));
+      v.SetDamping(eff_damping);
     }
-    if (pressure > 0.70f) {
+    if (pressure > 0.40f) {
       for (auto& v : _vox) {
         v.SetBowPressure(0.0f);
         v.SetSustain(false);
@@ -139,14 +144,20 @@ void String::SetStructure(const float value) {
 
 void String::SetDamping(const float value) {
   _damping = value * .7f;
-  for (auto& v : _vox) {
-    v.SetDamping(_damping);
+  if (!_is_dampen_active) {
+    for (auto& v : _vox) {
+      v.SetDamping(_damping);
+    }
   }
 }
 
 void String::SetVoicePressure(const uint8_t voice_num, const float pressure) {
   if (voice_num < kVoicesCount) {
-    _vox[voice_num].SetBowPressure(pressure);
+    float eff_p = pressure;
+    if (_is_dampen_active) {
+      eff_p *= daisysp::fclamp(1.0f - 1.4f * _dampen_pressure, 0.0f, 1.0f);
+    }
+    _vox[voice_num].SetBowPressure(eff_p);
   }
 }
 
@@ -209,7 +220,7 @@ void String::NoteOn(const uint8_t num, const float velocity) {
         if (_exciter_mode == 2) {
           // Bow mode: legato portamento transition on single centered voice
           _vox[0].SetFreq(freq);
-          _vox[0].SetBowPressure(velocity);
+          _vox[0].BowStroke(velocity);
         } else if (_exciter_mode == 1) {
           // Pluck + Bow on hold
           _vox[0].NoteOn(freq, velocity);
@@ -228,7 +239,7 @@ void String::NoteOn(const uint8_t num, const float velocity) {
         _humanize_and_apply(num);
         if (_exciter_mode == 2) {
           _vox[num].SetFreq(freq);
-          _vox[num].SetBowPressure(velocity);
+          _vox[num].BowStroke(velocity);
         } else {
           _vox[num].SetSustain(false);
           _vox[num].SetBowPressure(0.0f);
@@ -396,9 +407,10 @@ void String::_on_arp_note_on(uint8_t num, uint8_t vel) {
   float pluck_vel = (p > 0.05f) ? daisysp::fclamp(sqrtf(p), 0.25f, 1.0f) : 0.85f;
 
   if (_exciter_mode == 2) {
-    // Bow mode: soft strike transient + rich bowing excitation
-    _vox[voice_idx].NoteOn(freq, pluck_vel * 0.40f);
-    _vox[voice_idx].SetBowPressure(pluck_vel);
+    // Pure Bow mode: zero pluck strike, pure acoustic stick-slip bowing excitation.
+    // In Mono mode, frequency glides with portamento. In Poly mode, strings ring out in bariolage.
+    _vox[voice_idx].SetFreq(freq);
+    _vox[voice_idx].BowStroke(pluck_vel);
     _vox[voice_idx].SetSustain(true);
   } else if (_exciter_mode == 1) {
     // Pluck + Bow mode: full pluck strike + warm bowed sustain cushion
@@ -414,10 +426,18 @@ void String::_on_arp_note_on(uint8_t num, uint8_t vel) {
 };
 
 void String::_on_arp_note_off(uint8_t num) {
-  uint8_t voice_idx = _is_mono ? 0 : num;
-  if (voice_idx < kVoicesCount) {
-    _vox[voice_idx].SetBowPressure(0.0f);
-    _vox[voice_idx].SetSustain(false);
+  if (_is_mono) {
+    if (_exciter_mode == 2) {
+      // In Bow mode Mono: sustain bow across steps for continuous slurred portamento!
+      return;
+    }
+    _vox[0].SetBowPressure(0.0f);
+    _vox[0].SetSustain(false);
+  } else {
+    if (num < kVoicesCount) {
+      _vox[num].SetBowPressure(0.0f);
+      _vox[num].SetSustain(false);
+    }
   }
 }
 

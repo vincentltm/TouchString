@@ -182,6 +182,7 @@ private:
   float _current_oct_mult;
   std::array<float, kVoicesCount> _voice_oct_mult;
   bool _is_dampen_active;
+  float _dampen_pressure;
   daisysp::Svf _body_filter_l;
   daisysp::Svf _body_filter_r;
 

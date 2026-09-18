@@ -93,7 +93,8 @@ void StringUI::Process(DaisySeed& hw) {
 
     // String Dampen Pad (P01)
     bool p01_touched = _touch.pads().IsTouched(1);
-    if (p01_touched && !_is_ch_touched) {
+    bool ch_touched = _is_ch_touched || _touch.pads().IsTouched(11);
+    if (p01_touched && !ch_touched) {
         float p01_press = _touch.pads().Pressure(1);
         _string.SetDampenPad(true, p01_press);
     } else {
@@ -272,7 +273,7 @@ void StringUI::_on_pad_touch(uint16_t pad) {
         return;
     }
     if (pad == 1) {
-        if (_is_ch_touched) {
+        if (_touch.pads().IsTouched(11) || _is_ch_touched) {
             _string.ToggleMono();
             _led_blink_pattern = _string.IsMono() ? 1 : 2;
             _led_blink_counter = 75;
