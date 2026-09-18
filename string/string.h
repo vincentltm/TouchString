@@ -64,6 +64,9 @@ public:
   void SetVoiceSustain(const uint8_t voice_num, const bool sustain);
   void SetVoiceAftertouch(const uint8_t voice_num, const float pressure);
 
+  void SetCurrentOctaveMult(const float mult) { _current_oct_mult = mult; }
+  void SetDampenPad(const bool active, const float pressure);
+
   void SetBowPressure(const float pressure);
   void SetSustain(const bool sustain);
   void SetExciterMode(const int mode) {
@@ -176,6 +179,9 @@ private:
   bool _is_mono;
   std::array<uint8_t, kVoicesCount> _mono_stack;
   uint8_t _mono_stack_size;
+  float _current_oct_mult;
+  std::array<float, kVoicesCount> _voice_oct_mult;
+  bool _is_dampen_active;
 
   // Stereo panning mapped to physical touchpad layout:
   // Voice 0 (P03): Far Left,    Voice 1 (P04): Mid Left,     Voice 2 (P05): Center,

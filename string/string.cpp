@@ -18,9 +18,12 @@ _exciter_mode         { 0 },
 _input_volume         { 0.f },
 _trans_mult           { 1.f },
 _is_mono              { false },
-_mono_stack_size      { 0 }
+_mono_stack_size      { 0 },
+_current_oct_mult     { 1.f },
+_is_dampen_active     { false }
 {
   _mono_stack.fill(0);
+  _voice_oct_mult.fill(1.f);
   _note_on.fill(false);
   _note_hold.fill(false);
   _pad_pressure.fill(0.f);
@@ -88,10 +91,27 @@ void String::SetScaleIndex(const uint8_t index) {
 
 void String::SetTransp(const float value) {
   _trans_mult = _scale.TransMult(value);
-  bool is_realtime = (_exciter_mode == 2) || (_input_volume > 0.005f);
   for (size_t i = 0; i < kVoicesCount; i++) {
-    if (is_realtime || _vox[i].IsBowing() || !_vox[i].IsActive()) {
-      _vox[i].SetMult(_trans_mult);
+    _vox[i].SetMult(_trans_mult);
+  }
+}
+
+void String::SetDampenPad(const bool active, const float pressure) {
+  _is_dampen_active = active;
+  if (active) {
+    float eff_damping = daisysp::fclamp(0.65f + 0.30f * pressure, 0.0f, 0.98f);
+    for (auto& v : _vox) {
+      v.SetDamping(std::max(_damping, eff_damping));
+    }
+    if (pressure > 0.70f) {
+      for (auto& v : _vox) {
+        v.SetBowPressure(0.0f);
+        v.SetSustain(false);
+      }
+    }
+  } else {
+    for (auto& v : _vox) {
+      v.SetDamping(_damping);
     }
   }
 }
@@ -175,7 +195,8 @@ void String::NoteOn(const uint8_t num, const float velocity) {
         }
 
         uint8_t target_pad = _mono_stack[_mono_stack_size - 1];
-        float freq = _scale.FreqAt(target_pad);
+        _voice_oct_mult[target_pad] = _current_oct_mult;
+        float freq = _scale.FreqAt(target_pad) * _current_oct_mult;
         _vox[0].SetMult(_trans_mult, false);
 
         if (_exciter_mode == 2) {
@@ -194,15 +215,17 @@ void String::NoteOn(const uint8_t num, const float velocity) {
         return;
       } else {
         // Poly mode
+        _voice_oct_mult[num] = _current_oct_mult;
+        float freq = _scale.FreqAt(num) * _current_oct_mult;
         _vox[num].SetMult(_trans_mult, false);
         _humanize_and_apply(num);
         if (_exciter_mode == 2) {
-          _vox[num].SetFreq(_scale.FreqAt(num));
+          _vox[num].SetFreq(freq);
           _vox[num].SetBowPressure(velocity);
         } else {
           _vox[num].SetSustain(false);
           _vox[num].SetBowPressure(0.0f);
-          _vox[num].NoteOn(_scale.FreqAt(num), velocity);
+          _vox[num].NoteOn(freq, velocity);
         }
         return;
       }
@@ -239,7 +262,7 @@ void String::NoteOff(const uint8_t num) {
         if (_mono_stack_size > 0) {
           // Legato return to top of stack
           uint8_t prev_pad = _mono_stack[_mono_stack_size - 1];
-          float prev_freq = _scale.FreqAt(prev_pad);
+          float prev_freq = _scale.FreqAt(prev_pad) * _voice_oct_mult[prev_pad];
           float prev_press = _pad_pressure[prev_pad];
           if (prev_press < 0.2f) prev_press = 0.6f;
 
@@ -285,6 +308,7 @@ void String::Reset() {
   _arp.Clear();
   _latch.clear();
   _mono_stack_size = 0;
+  _voice_oct_mult.fill(1.f);
   for (auto& v : _vox) {
     v.SetSustain(false);
     v.SetBowPressure(0.0f);
@@ -350,7 +374,8 @@ void String::_on_arp_note_on(uint8_t num, uint8_t vel) {
     }
   }
   _vox[voice_idx].SetMult(_trans_mult, false);
-  auto freq = _is_arp_on ? _humanized_note_freq(num) : _scale.FreqAt(num);
+  auto base_f = _is_arp_on ? _humanized_note_freq(num) : _scale.FreqAt(num);
+  auto freq = base_f * _voice_oct_mult[num];
   _humanize_and_apply(voice_idx);
   float p = _pad_pressure[num];
   float pluck_vel = (p > 0.05f) ? daisysp::fclamp(sqrtf(p), 0.25f, 1.0f) : 0.85f;

@@ -92,6 +92,30 @@ void StringUI::Process(DaisySeed& hw) {
         }
     }
 
+    // Octave hold pads (P00 = Octave Down, P02 = Octave Up)
+    float oct_mult = 1.0f;
+    if (!_is_to_touched && !_is_ch_touched) {
+        bool p00 = _touch.pads().IsTouched(0);
+        bool p02 = _touch.pads().IsTouched(2);
+        if (p00 && p02) {
+            oct_mult = 0.25f; // Sub-bass (-2 octaves)
+        } else if (p00) {
+            oct_mult = 0.50f; // -1 octave
+        } else if (p02) {
+            oct_mult = 2.00f; // +1 octave
+        }
+    }
+    _string.SetCurrentOctaveMult(oct_mult);
+
+    // String Dampen Pad (P01)
+    bool p01_touched = _touch.pads().IsTouched(1);
+    if (p01_touched && !_is_ch_touched) {
+        float p01_press = _touch.pads().Pressure(1);
+        _string.SetDampenPad(true, p01_press);
+    } else {
+        _string.SetDampenPad(false, 0.0f);
+    }
+
     // Continuous pressure handling for bowing / hold ...........
     if (is_arp_on) {
         for (uint8_t i = 0; i < 7; i++) {
@@ -240,8 +264,8 @@ void StringUI::_on_pad_touch(uint16_t pad) {
             _string.ToggleMono();
             _led_blink_pattern = _string.IsMono() ? 1 : 2;
             _led_blink_counter = 75;
-            return;
         }
+        return;
     }
 
     if (pad < kFirstNotePad || pad >= kFirstNotePad + String::kVoicesCount) return;
@@ -252,6 +276,10 @@ void StringUI::_on_pad_touch(uint16_t pad) {
 };
 
 void StringUI::_on_pad_release(uint16_t pad) {
+    if (pad == 1) {
+        _string.SetDampenPad(false, 0.0f);
+        return;
+    }
     if (pad < kFirstNotePad || pad >= kFirstNotePad + String::kVoicesCount) return;
     auto note_num = pad - kFirstNotePad;
     _hold_ticks[note_num] = 0;

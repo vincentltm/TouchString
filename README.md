@@ -8,18 +8,21 @@ Download the [binary file](https://github.com/Synthux-Academy/TouchString/releas
 <img src="touch.jpeg" width="300"/>
 
 ### Pads
-- P10 + P00 - tempo down
-- P11 + P00 - previous scale
-- P10 + P02 - tempo up
-- P11 + P02 - next scale
-- P11 + P01 - Poly / Mono toggle (LED double-blink = Mono, single blink = Poly)
-- P03...P09 - note pads
-- P10 - "TO" modifier | Hold to enable tempo control and alternative knob functions
-- P11 - "CH" modifier | Hold to enable scale selection
+- **P00** (hold) - Octave Down (-1 oct) | Hold both P00 + P02 for Sub-bass (-2 oct)
+- **P01** - String Dampen Pad / Acoustic Choke (squeeze to damp ringing strings, tap to choke)
+- **P02** (hold) - Octave Up (+1 oct)
+- **P03...P09** - Note pads (strings 1 to 7)
+- **P10** - "TO" modifier | Hold to enable tempo control and alternative knob functions:
+  - P10 + P00 - Tempo down
+  - P10 + P02 - Tempo up
+- **P11** - "CH" modifier | Hold to enable scale selection and voice modes:
+  - P11 + P00 - Previous scale
+  - P11 + P02 - Next scale
+  - P11 + P01 - Poly / Mono toggle (LED double-blink = Mono, single blink = Poly)
 
 ### Knobs (clockwise)
 - S30 **Brightness** | Controls filter brightness/cutoff frequency
-- S31 **Pitch** | Global pitch transpose/tuning
+- S31 **Pitch** | Root note tuning across $\pm 1$ octave (25 chromatic semitones, center = unison root)
 - S32 **Timbre** | Sound structure/harmonic content
 - S33 **Density** | Pattern density/complexity
 - S33 + TO (pad 10) **Pattern Shift**
@@ -45,7 +48,9 @@ Download the [binary file](https://github.com/Synthux-Academy/TouchString/releas
   - **Up**: Arpeggiator Latched
 
 ### Polyphony & Expression
-- **Poly / Mono Modes**: Toggle with P11 + P01. In Poly mode, all 7 string voices run concurrently in stereo. In Mono mode, notes have last-note priority with legato pitch gliding in Bow mode and clean single-string damping in Pluck mode.
+- **Poly / Mono Modes**: Toggle with P11 + P01. In Poly mode, all 7 string voices run concurrently in stereo. In Mono mode, notes have last-note priority with centered stereo panning, smooth legato pitch gliding (~35 ms portamento) in Bow mode, and clean single-string damping in Pluck mode.
+- **Octave Hold Drone**: Octave shift is locked per voice when triggered. Holding P00 drops the current note by 1 octave, while releasing P00 allows subsequent plucked/bowed notes to play at standard pitch or +1 octave (P02). This enables holding a continuous bowed bass drone while playing higher melody notes!
+- **String Dampen / Acoustic Choke (P01)**: Squeezing P01 introduces strong acoustic damping across all strings to simulate palm-muting. Tapping P01 quickly silences ringing resonance.
 - **Velocity Sensitivity**: Pluck strike force affects attack volume and brightness.
 - **Aftertouch**: In Pluck mode, micro-rocking or squeezing a held pad bends pitch slightly (+25 cents) for finger vibrato. In Bow mode, pressure modulates bow friction and timbre.
 
