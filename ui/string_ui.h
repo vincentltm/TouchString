@@ -18,7 +18,9 @@ public:
     _scale_index { 0 },
     _exciter_mode { 0 },
     _was_arp_on { false },
-    _is_first_run { true }
+    _is_first_run { true },
+    _led_blink_counter { 0 },
+    _led_blink_pattern { 0 }
      {
          _hold_ticks.fill(0);
      }
@@ -69,6 +71,8 @@ private:
     int _exciter_mode;
     bool _was_arp_on;
     bool _is_first_run;
+    uint8_t _led_blink_counter;
+    uint8_t _led_blink_pattern;
 };
 
 };

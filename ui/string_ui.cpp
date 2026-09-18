@@ -98,6 +98,47 @@ void StringUI::Process(DaisySeed& hw) {
             uint16_t p_idx = i + kFirstNotePad;
             _string.SetPadPressure(i, _touch.pads().IsTouched(p_idx) ? _touch.pads().Pressure(p_idx) : 0.0f);
         }
+    } else if (_string.IsMono()) {
+        uint8_t active = _string.ActiveMonoVoice();
+        if (_exciter_mode == 2) {
+            if (active < 7 && _touch.pads().IsTouched(active + kFirstNotePad)) {
+                _string.SetVoicePressure(active, _touch.pads().Pressure(active + kFirstNotePad));
+            } else if (active < 7) {
+                _string.SetVoicePressure(active, 0.0f);
+            }
+        } else if (_exciter_mode == 1) {
+            for (uint8_t i = 0; i < 7; i++) {
+                uint16_t p_idx = i + kFirstNotePad;
+                if (_touch.pads().IsTouched(p_idx)) {
+                    if (i == active) {
+                        _hold_ticks[i]++;
+                        if (_hold_ticks[i] > 6) {
+                            _string.SetVoicePressure(i, _touch.pads().Pressure(p_idx) * 0.65f);
+                            _string.SetVoiceSustain(i, true);
+                        } else {
+                            _string.SetPadPressure(i, _touch.pads().Pressure(p_idx));
+                        }
+                    } else {
+                        _hold_ticks[i] = 0;
+                        _string.SetVoiceSustain(i, false);
+                        _string.SetVoicePressure(i, 0.0f);
+                    }
+                } else {
+                    _hold_ticks[i] = 0;
+                    _string.SetVoiceSustain(i, false);
+                    _string.SetVoicePressure(i, 0.0f);
+                    _string.SetPadPressure(i, 0.0f);
+                }
+            }
+        } else {
+            _string.SetSustain(false);
+            for (uint8_t i = 0; i < 7; i++) {
+                uint16_t p_idx = i + kFirstNotePad;
+                float p = (i == active && _touch.pads().IsTouched(p_idx)) ? _touch.pads().Pressure(p_idx) : 0.0f;
+                _string.SetPadPressure(i, p);
+                _string.SetVoicePressure(i, 0.0f);
+            }
+        }
     } else {
         if (_exciter_mode == 2) {
             for (uint8_t i = 0; i < 7; i++) {
@@ -170,7 +211,24 @@ void StringUI::Process(DaisySeed& hw) {
     _string.SetDrive(drive_amt);
     _string.SetInputVolume(in_vol_amt);
 
-    hw.SetLed(_string.IsLatched());
+    if (_led_blink_counter > 0) {
+        _led_blink_counter--;
+        bool led_on = false;
+        if (_led_blink_pattern == 1) {
+            // Mono: Double blink
+            if ((_led_blink_counter > 55) || (_led_blink_counter > 25 && _led_blink_counter <= 40)) {
+                led_on = true;
+            }
+        } else if (_led_blink_pattern == 2) {
+            // Poly: Single long blink
+            if (_led_blink_counter > 15) {
+                led_on = true;
+            }
+        }
+        hw.SetLed(led_on);
+    } else {
+        hw.SetLed(_string.IsLatched());
+    }
 };
 
 void StringUI::_on_pad_touch(uint16_t pad) {
@@ -184,6 +242,14 @@ void StringUI::_on_pad_touch(uint16_t pad) {
         if (_is_to_touched) _string.SpeedUp();
         else if (_is_ch_touched) _next_scale();
         return;
+    }
+    if (pad == 1) {
+        if (_is_ch_touched) {
+            _string.ToggleMono();
+            _led_blink_pattern = _string.IsMono() ? 1 : 2;
+            _led_blink_counter = 75;
+            return;
+        }
     }
 
     if (pad < kFirstNotePad || pad >= kFirstNotePad + String::kVoicesCount) return;

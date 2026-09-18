@@ -16,8 +16,12 @@ _volume               { 1.f },
 _is_arp_on            { false },
 _exciter_mode         { 0 },
 _input_volume         { 0.f },
-_trans_mult           { 1.f }
+_trans_mult           { 1.f },
+_is_mono              { false },
+_active_mono_voice    { 0xff },
+_mono_stack_size      { 0 }
 {
+  _mono_stack.fill(0);
   _note_on.fill(false);
   _note_hold.fill(false);
   _pad_pressure.fill(0.f);
@@ -25,6 +29,18 @@ _trans_mult           { 1.f }
   _reverb_out.fill(0.f);
   _bus.fill(0.f);
 };
+
+void String::SetMono(const bool mono) {
+  if (_is_mono != mono) {
+    _is_mono = mono;
+    _mono_stack_size = 0;
+    _active_mono_voice = 0xff;
+    for (auto& v : _vox) {
+      v.SetBowPressure(0.0f);
+      v.SetSustain(false);
+    }
+  }
+}
 
 void String::Init(const float sample_rate, const float buffer_size) {
   using namespace std::placeholders;
@@ -140,15 +156,62 @@ void String::NoteOn(const uint8_t num, const float velocity) {
     _pad_pressure[num] = velocity;
     _humanize_and_apply(num);
     if (!_is_arp_on) {
-      if (_exciter_mode == 2) {
-        _vox[num].SetFreq(_scale.FreqAt(num));
-        _vox[num].SetBowPressure(velocity);
+      if (_is_mono) {
+        // Manage mono note stack
+        bool already_in = false;
+        for (uint8_t i = 0; i < _mono_stack_size; i++) {
+          if (_mono_stack[i] == num) {
+            for (uint8_t j = i; j + 1 < _mono_stack_size; j++) {
+              _mono_stack[j] = _mono_stack[j + 1];
+            }
+            _mono_stack[_mono_stack_size - 1] = num;
+            already_in = true;
+            break;
+          }
+        }
+        if (!already_in && _mono_stack_size < kVoicesCount) {
+          _mono_stack[_mono_stack_size++] = num;
+        }
+
+        if (_exciter_mode == 2) {
+          // Bow mode: legato transition
+          if (_active_mono_voice < kVoicesCount && _vox[_active_mono_voice].IsBowing()) {
+            _vox[_active_mono_voice].SetFreq(_scale.FreqAt(num));
+            _vox[_active_mono_voice].SetBowPressure(velocity);
+          } else {
+            for (auto& v : _vox) {
+              v.SetBowPressure(0.0f);
+              v.SetSustain(false);
+            }
+            _active_mono_voice = num;
+            _vox[num].SetFreq(_scale.FreqAt(num));
+            _vox[num].SetBowPressure(velocity);
+          }
+        } else {
+          // Pluck / Pluck+Bow mode: silence other voices and strike new note
+          for (size_t i = 0; i < kVoicesCount; i++) {
+            if (i != num) {
+              _vox[i].Reset();
+            }
+          }
+          _active_mono_voice = num;
+          _vox[num].SetSustain(false);
+          _vox[num].SetBowPressure(0.0f);
+          _vox[num].NoteOn(_scale.FreqAt(num), velocity);
+        }
+        return;
       } else {
-        _vox[num].SetSustain(false);
-        _vox[num].SetBowPressure(0.0f);
-        _vox[num].NoteOn(_scale.FreqAt(num), velocity);
+        // Poly mode
+        if (_exciter_mode == 2) {
+          _vox[num].SetFreq(_scale.FreqAt(num));
+          _vox[num].SetBowPressure(velocity);
+        } else {
+          _vox[num].SetSustain(false);
+          _vox[num].SetBowPressure(0.0f);
+          _vox[num].NoteOn(_scale.FreqAt(num), velocity);
+        }
+        return;
       }
-      return;
     }
   }
 
@@ -167,8 +230,54 @@ void String::NoteOff(const uint8_t num) {
     _pad_pressure[num] = 0.0f;
     _vox[num].SetAftertouch(0.0f);
     if (!_is_arp_on) {
-      _vox[num].SetSustain(false);
-      _vox[num].SetBowPressure(0.0f);
+      if (_is_mono) {
+        // Remove num from mono stack
+        for (uint8_t i = 0; i < _mono_stack_size; i++) {
+          if (_mono_stack[i] == num) {
+            for (uint8_t j = i; j + 1 < _mono_stack_size; j++) {
+              _mono_stack[j] = _mono_stack[j + 1];
+            }
+            _mono_stack_size--;
+            break;
+          }
+        }
+
+        if (_mono_stack_size > 0) {
+          // Legato return to top of stack
+          uint8_t prev_num = _mono_stack[_mono_stack_size - 1];
+          float prev_press = _pad_pressure[prev_num];
+          if (prev_press < 0.2f) prev_press = 0.6f;
+
+          if (_exciter_mode == 2) {
+            if (_active_mono_voice < kVoicesCount) {
+              _vox[_active_mono_voice].SetFreq(_scale.FreqAt(prev_num));
+              _vox[_active_mono_voice].SetBowPressure(prev_press);
+            } else {
+              _active_mono_voice = prev_num;
+              _vox[prev_num].SetFreq(_scale.FreqAt(prev_num));
+              _vox[prev_num].SetBowPressure(prev_press);
+            }
+          } else {
+            for (size_t i = 0; i < kVoicesCount; i++) {
+              if (i != prev_num) _vox[i].Reset();
+            }
+            _active_mono_voice = prev_num;
+            _vox[prev_num].NoteOn(_scale.FreqAt(prev_num), prev_press);
+          }
+        } else {
+          // Stack empty - silence
+          if (_active_mono_voice < kVoicesCount) {
+            _vox[_active_mono_voice].SetSustain(false);
+            _vox[_active_mono_voice].SetBowPressure(0.0f);
+          }
+          _active_mono_voice = 0xff;
+        }
+        return;
+      } else {
+        // Poly mode
+        _vox[num].SetSustain(false);
+        _vox[num].SetBowPressure(0.0f);
+      }
     }
   }
 
@@ -186,6 +295,8 @@ void String::Reset() {
   _pattern.Reset();
   _arp.Clear();
   _latch.clear();
+  _mono_stack_size = 0;
+  _active_mono_voice = 0xff;
   for (auto& v : _vox) {
     v.SetSustain(false);
     v.SetBowPressure(0.0f);
@@ -237,6 +348,13 @@ void String::_on_latch_note_off(uint8_t num)
 
 void String::_on_arp_note_on(uint8_t num, uint8_t vel) {
   if (num >= kVoicesCount) return;
+  if (_is_mono) {
+    for (size_t i = 0; i < kVoicesCount; i++) {
+      if (i != num) {
+        _vox[i].Reset();
+      }
+    }
+  }
   _vox[num].SetMult(_trans_mult, false);
   auto freq = _is_arp_on ? _humanized_note_freq(num) : _scale.FreqAt(num);
   _humanize_and_apply(num);

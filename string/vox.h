@@ -365,6 +365,20 @@ public:
   bool IsActive() const { return _is_active; }
   bool IsBowing() const { return _is_bowing; }
 
+  void Reset() {
+    _string.Reset();
+    _filter.Init(_sample_rate);
+    _filter.SetRes(0.0f);
+    _is_active = false;
+    _is_bowing = false;
+    _bow_pressure = 0.f;
+    _bow_env = 0.f;
+    _remaining_impulse = 0;
+    _silent_samples = 0;
+    _aftertouch = 0.f;
+    _target_aftertouch = 0.f;
+  }
+
   float Process(float ext_in = 0.f) {
     if (fabsf(ext_in) > 0.0001f) {
       _is_active = true;

@@ -52,6 +52,11 @@ public:
   bool IsLatched() { return _latch.on(); }
   void SetLatch(const bool new_latch);
 
+  bool IsMono() const { return _is_mono; }
+  void SetMono(const bool mono);
+  void ToggleMono() { SetMono(!_is_mono); }
+  uint8_t ActiveMonoVoice() const { return _active_mono_voice; }
+
   void NoteOn(const uint8_t note_num, const float velocity = 1.f);
   void NoteOff(const uint8_t note_num);
 
@@ -167,6 +172,10 @@ private:
   float _input_volume;
   float _trans_mult;
   std::array<float, kVoicesCount> _pad_pressure;
+  bool _is_mono;
+  uint8_t _active_mono_voice;
+  std::array<uint8_t, kVoicesCount> _mono_stack;
+  uint8_t _mono_stack_size;
 
   // Stereo panning mapped to physical touchpad layout:
   // Voice 0 (P03): Far Left,    Voice 1 (P04): Mid Left,     Voice 2 (P05): Center,

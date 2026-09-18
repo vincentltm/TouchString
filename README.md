@@ -12,6 +12,7 @@ Download the [binary file](https://github.com/Synthux-Academy/TouchString/releas
 - P11 + P00 - previous scale
 - P10 + P02 - tempo up
 - P11 + P02 - next scale
+- P11 + P01 - Poly / Mono toggle (LED double-blink = Mono, single blink = Poly)
 - P03...P09 - note pads
 - P10 - "TO" modifier | Hold to enable tempo control and alternative knob functions
 - P11 - "CH" modifier | Hold to enable scale selection
@@ -44,7 +45,7 @@ Download the [binary file](https://github.com/Synthux-Academy/TouchString/releas
   - **Up**: Arpeggiator Latched
 
 ### Polyphony & Expression
-- **7-Voice Polyphony**: Each note pad (P03–P09) has its own dedicated physical string voice running concurrently in stereo.
+- **Poly / Mono Modes**: Toggle with P11 + P01. In Poly mode, all 7 string voices run concurrently in stereo. In Mono mode, notes have last-note priority with legato pitch gliding in Bow mode and clean single-string damping in Pluck mode.
 - **Velocity Sensitivity**: Pluck strike force affects attack volume and brightness.
 - **Aftertouch**: In Pluck mode, micro-rocking or squeezing a held pad bends pitch slightly (+25 cents) for finger vibrato. In Bow mode, pressure modulates bow friction and timbre.
 
