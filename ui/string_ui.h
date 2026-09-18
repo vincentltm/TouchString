@@ -17,7 +17,8 @@ public:
     _string { string },
     _scale_index { 0 },
     _exciter_mode { 0 },
-    _was_arp_on { false }
+    _was_arp_on { false },
+    _is_first_run { true }
      {
          _hold_ticks.fill(0);
      }
@@ -67,6 +68,7 @@ private:
     std::array<uint16_t, 7> _hold_ticks;
     int _exciter_mode;
     bool _was_arp_on;
+    bool _is_first_run;
 };
 
 };

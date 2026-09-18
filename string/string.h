@@ -101,9 +101,16 @@ public:
   void SetReverbMix(const float value) { _xfade.SetStage(value); }
 
   void SetDrive(const float value) {
-    _drive.SetDrive(0.2f + value * .3f);
-    _volume = 1.f - value * 0.4f;
-    _volume *= _volume;
+    if (value < 0.35f) {
+      _drive.SetDrive(0.2f);
+      float atten = value / 0.35f;
+      _volume = atten * atten;
+    } else {
+      float u = (value - 0.35f) / 0.65f;
+      _drive.SetDrive(0.2f + u * 0.3f);
+      float comp = 1.f - u * 0.35f;
+      _volume = comp * comp;
+    }
   }
 
   void SetInputVolume(const float value) { _input_volume = daisysp::fclamp(value, 0.f, 1.f); }

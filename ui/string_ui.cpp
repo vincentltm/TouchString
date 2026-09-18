@@ -42,6 +42,21 @@ void StringUI::Process(DaisySeed& hw) {
     _is_to_touched = _touch.pads().IsTouched(10);
     _is_ch_touched = _touch.pads().IsTouched(11);
 
+    if (_is_first_run) {
+        _is_first_run = false;
+        auto initial_s36 = _touch.knobs().s36().Process();
+        _drive_value.SetTracking(initial_s36);
+        _string.SetDrive(initial_s36);
+
+        auto initial_s33 = _touch.knobs().s33().Process();
+        _pattern_value.SetTracking(initial_s33);
+        _string.SetPattern(initial_s33);
+
+        auto initial_s35 = _touch.knobs().s35().Process();
+        _human_string_value.SetTracking(initial_s35);
+        _string.SetHumanStringChance(initial_s35);
+    }
+
     // Arp mode / latch ..........................................
     auto switch_value = _touch.switches().A();
     std::array<bool, kNotesCount> touched;

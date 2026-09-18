@@ -27,7 +27,7 @@ Download the [binary file](https://github.com/Synthux-Academy/TouchString/releas
 - S35 + TO (pad 10) **Reverb Mix**
 
 ### Faders
-- S36 (left) **Drive** | Distortion/overdrive amount (reduces volume as drive increases)
+- S36 (left) **Drive** | Lower range attenuates volume to quiet; upper range increases overdrive
 - S36 + TO (pad 10) **Input Volume** | External audio input gain for sympathetic string resonance (Rings mode)
 - S37 (right) **Damp** | String damping/decay time
 
