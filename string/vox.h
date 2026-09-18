@@ -305,8 +305,8 @@ public:
     _target_aftertouch = 0.f;
     _aftertouch_baseline = 1.0f;
     _aftertouch_lockout = 12000; // 250ms at 48kHz: rock-solid stable strike attack
-    _accent = daisysp::fclamp(0.10f + 0.80f * velocity, 0.05f, 0.90f);
-    _strike_gain = 0.15f + 0.80f * (velocity * velocity);
+    _accent = daisysp::fclamp(0.04f + 0.90f * velocity, 0.02f, 0.95f);
+    _strike_gain = velocity * (0.05f + 0.95f * velocity);
     _update_bright_ratio();
     _update_filter();
     _update_string_params();
