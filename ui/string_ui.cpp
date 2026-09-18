@@ -117,10 +117,11 @@ void StringUI::Process(DaisySeed& hw) {
                 // Bow mode: hand pressure directly modulates bowing on single centered voice
                 _string.SetVoicePressure(0, press);
             } else if (_exciter_mode == 1) {
-                // Pluck + Bow on hold
+                // Pluck + Bow on hold (Squeeze-to-swell)
                 _hold_ticks[active]++;
-                if (_hold_ticks[active] > 6) {
-                    _string.SetVoicePressure(0, press * 0.65f);
+                if (_hold_ticks[active] > 5 && press > 0.08f) {
+                    float bow_amt = (press - 0.08f) / 0.92f;
+                    _string.SetVoicePressure(0, daisysp::fclamp(bow_amt * 0.70f, 0.0f, 0.85f));
                     _string.SetVoiceSustain(0, true);
                 } else {
                     _string.SetVoicePressure(0, 0.0f);
@@ -154,12 +155,16 @@ void StringUI::Process(DaisySeed& hw) {
                 uint16_t p_idx = i + kFirstNotePad;
                 if (_touch.pads().IsTouched(p_idx)) {
                     _hold_ticks[i]++;
-                    if (_hold_ticks[i] > 6) {
-                        // Warm bowed sustain cushion behind the pluck (matches switch down but slightly quieter)
-                        _string.SetVoicePressure(i, _touch.pads().Pressure(p_idx) * 0.65f);
+                    float p = _touch.pads().Pressure(p_idx);
+                    if (_hold_ticks[i] > 5 && p > 0.08f) {
+                        // Squeeze-to-swell: blooms into bowed sustain as finger presses down
+                        float bow_amt = (p - 0.08f) / 0.92f;
+                        _string.SetVoicePressure(i, daisysp::fclamp(bow_amt * 0.70f, 0.0f, 0.85f));
                         _string.SetVoiceSustain(i, true);
                     } else {
-                        _string.SetPadPressure(i, _touch.pads().Pressure(p_idx));
+                        _string.SetVoicePressure(i, 0.0f);
+                        _string.SetVoiceSustain(i, false);
+                        _string.SetPadPressure(i, p);
                     }
                 } else {
                     _hold_ticks[i] = 0;

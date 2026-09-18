@@ -182,6 +182,8 @@ private:
   float _current_oct_mult;
   std::array<float, kVoicesCount> _voice_oct_mult;
   bool _is_dampen_active;
+  daisysp::Svf _body_filter_l;
+  daisysp::Svf _body_filter_r;
 
   // Stereo panning mapped to physical touchpad layout:
   // Voice 0 (P03): Far Left,    Voice 1 (P04): Mid Left,     Voice 2 (P05): Center,

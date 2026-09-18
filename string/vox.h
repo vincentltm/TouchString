@@ -243,7 +243,9 @@ public:
     _last_bow_update { 0.f },
     _rand_seed { 123456789 },
     _is_active { false },
-    _silent_samples { 0 }
+    _silent_samples { 0 },
+    _last_string_out { 0.f },
+    _rosin_bite_samples { 0 }
   {}
   ~Vox() {}
 
@@ -265,6 +267,8 @@ public:
     _is_active = false;
     _silent_samples = 0;
     _last_bow_update = 0.f;
+    _last_string_out = 0.f;
+    _rosin_bite_samples = 0;
     SetStructure(0.5f);
     SetBrightness(0.5f);
     SetDamping(0.5f);
@@ -314,6 +318,8 @@ public:
     if (_remaining_impulse > 1024) _remaining_impulse = 1024;
     _is_active = true;
     _silent_samples = 0;
+    _last_string_out = 0.f;
+    _rosin_bite_samples = 14;
   }
 
   void SetFreq(float freq) {
@@ -338,9 +344,11 @@ public:
     if (!sustain) {
       _bow_pressure = 0.f;
       _bow_env = 0.f;
+      _rosin_bite_samples = 0;
     } else {
       if (!was_bowing) {
         _last_bow_update = -1.0f;
+        _rosin_bite_samples = 14;
       }
       _is_active = true;
       _silent_samples = 0;
@@ -348,17 +356,20 @@ public:
   }
 
   void SetBowPressure(float pressure) {
+    float prev_p = _bow_pressure;
     _bow_pressure = daisysp::fclamp(pressure, 0.f, 1.f);
     bool was_bowing = _is_bowing;
     _is_bowing = (_bow_pressure > 0.005f);
     if (_is_bowing) {
-      if (!was_bowing) {
+      if (!was_bowing || (_bow_pressure - prev_p > 0.35f)) {
         _last_bow_update = -1.0f;
+        _rosin_bite_samples = 14;
       }
       _is_active = true;
       _silent_samples = 0;
     } else {
       _bow_env = 0.f;
+      _rosin_bite_samples = 0;
     }
   }
 
@@ -377,6 +388,8 @@ public:
     _silent_samples = 0;
     _aftertouch = 0.f;
     _target_aftertouch = 0.f;
+    _last_string_out = 0.f;
+    _rosin_bite_samples = 0;
   }
 
   float Process(float ext_in = 0.f) {
@@ -413,7 +426,9 @@ public:
         _target_freq = _base_freq * (1.0f + bend);
       }
     } else {
-      _target_freq = _base_freq;
+      // Bow mode: subtle physical pitch deflection under heavy bow force (~2-4 cents flattening)
+      float pitch_flatten = daisysp::fclamp((_bow_env - 0.55f) * 0.006f, 0.0f, 0.003f);
+      _target_freq = _base_freq * (1.0f - pitch_flatten);
       _aftertouch = 0.0f;
     }
 
@@ -448,7 +463,17 @@ public:
     }
 
     if (_bow_env > 0.0001f) {
-      exc += noise * (_bow_env * 0.22f * _freq_scale);
+      // Closed-loop non-linear stick-slip Helmholtz friction
+      float v_rel = _bow_env - 0.60f * _last_string_out;
+      float friction = v_rel / (1.0f + 4.5f * (v_rel * v_rel));
+      float bow_force = friction * (_bow_env * 0.28f * _freq_scale);
+
+      float rosin = noise * (_bow_env * 0.08f * (0.35f + fabsf(v_rel)) * _freq_scale);
+      if (_rosin_bite_samples > 0) {
+        _rosin_bite_samples--;
+        rosin += noise * (0.16f * _freq_scale);
+      }
+      exc += bow_force + rosin;
     }
 
     if (fabsf(ext_in) > 0.00005f) {
@@ -459,6 +484,7 @@ public:
     float in = _filter.Low();
 
     float out = _string.Process(in);
+    _last_string_out = daisysp::fclamp(out, -1.2f, 1.2f);
 
     // Voice activity detection
     if (_remaining_impulse == 0 && _bow_env < 0.0001f && !_is_bowing && fabsf(ext_in) < 0.0001f) {
@@ -545,6 +571,9 @@ private:
 
   bool     _is_active;
   uint32_t _silent_samples;
+
+  float    _last_string_out;
+  uint8_t  _rosin_bite_samples;
 
   daisysp::Svf _filter;
   FastString   _string;

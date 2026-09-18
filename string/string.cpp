@@ -70,6 +70,13 @@ void String::Init(const float sample_rate, const float buffer_size) {
 
   _drive.Init();
 
+  _body_filter_l.Init(sample_rate);
+  _body_filter_r.Init(sample_rate);
+  _body_filter_l.SetFreq(310.0f);
+  _body_filter_l.SetRes(0.40f);
+  _body_filter_r.SetFreq(310.0f);
+  _body_filter_r.SetRes(0.40f);
+
   _reverb.Init(sample_rate);
   _reverb.SetFeedback(kReverbFeedback);
   _reverb.SetLpFreq(kReverLPFreq);
@@ -342,6 +349,12 @@ void String::Process(const float * const *in, float **out, size_t size) {
       sum_l *= 0.65f;
       sum_r *= 0.65f;
     }
+
+    // Acoustic wooden body soundboard formant resonance (~310 Hz)
+    _body_filter_l.Process(sum_l);
+    _body_filter_r.Process(sum_r);
+    sum_l = sum_l * 0.76f + _body_filter_l.Band() * 0.24f;
+    sum_r = sum_r * 0.76f + _body_filter_r.Band() * 0.24f;
 
     _bus[0] = _drive.Process(sum_l) * _volume;
     _bus[1] = _drive.Process(sum_r) * _volume;
