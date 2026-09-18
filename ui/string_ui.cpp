@@ -20,6 +20,8 @@ void StringUI::Init(daisy::DaisySeed& hw) {
 
     _pattern_value.Set(1.f);
     _shift_value.Set(0.f);
+    _drive_value.Set(0.f);
+    _in_vol_value.Set(0.f);
 
     // Initialize MIDI //////////////////////////////////////////
     /////////////////////////////////////////////////////////////
@@ -46,8 +48,80 @@ void StringUI::Process(DaisySeed& hw) {
     for (uint8_t i = 0; i < kNotesCount; i++) {
         touched[i] = _touch.pads().IsTouched(i + kFirstNotePad);
     }
+
+    // Exciter mode (Switch 1 / Left switch) .....................
+    auto exciter_switch = _touch.switches().B();
+    if (exciter_switch == daisy::Switch3::POS_UP) {
+        _exciter_mode = 0; // Pluck
+    } else if (exciter_switch == daisy::Switch3::POS_DOWN) {
+        _exciter_mode = 2; // Bow
+    } else {
+        _exciter_mode = 1; // Pluck + Bow on hold
+    }
+    _string.SetExciterMode(_exciter_mode);
+
+    // Arpeggiator (Switch 2 / Right switch) .....................
+    bool is_arp_on = switch_value != daisy::Switch3::POS_DOWN;
+    bool arp_just_enabled = is_arp_on && !_was_arp_on;
+    _was_arp_on = is_arp_on;
+
     _string.SetLatch(switch_value == daisy::Switch3::POS_UP);
-    _string.SetArpOn(switch_value != daisy::Switch3::POS_DOWN);
+    _string.SetArpOn(is_arp_on);
+
+    if (arp_just_enabled) {
+        for (uint8_t i = 0; i < 7; i++) {
+            uint16_t p_idx = i + kFirstNotePad;
+            if (_touch.pads().IsTouched(p_idx)) {
+                _string.NoteOn(i, _touch.pads().Velocity(p_idx));
+            }
+        }
+    }
+
+    // Continuous pressure handling for bowing / hold ...........
+    if (is_arp_on) {
+        for (uint8_t i = 0; i < 7; i++) {
+            uint16_t p_idx = i + kFirstNotePad;
+            _string.SetPadPressure(i, _touch.pads().IsTouched(p_idx) ? _touch.pads().Pressure(p_idx) : 0.0f);
+        }
+    } else {
+        if (_exciter_mode == 2) {
+            for (uint8_t i = 0; i < 7; i++) {
+                uint16_t p_idx = i + kFirstNotePad;
+                if (_touch.pads().IsTouched(p_idx)) {
+                    _string.SetVoicePressure(i, _touch.pads().Pressure(p_idx));
+                } else {
+                    _string.SetVoicePressure(i, 0.0f);
+                }
+            }
+        } else if (_exciter_mode == 1) {
+            for (uint8_t i = 0; i < 7; i++) {
+                uint16_t p_idx = i + kFirstNotePad;
+                if (_touch.pads().IsTouched(p_idx)) {
+                    _hold_ticks[i]++;
+                    if (_hold_ticks[i] > 6) {
+                        // Warm bowed sustain cushion behind the pluck (matches switch down but slightly quieter)
+                        _string.SetVoicePressure(i, _touch.pads().Pressure(p_idx) * 0.65f);
+                        _string.SetVoiceSustain(i, true);
+                    } else {
+                        _string.SetPadPressure(i, _touch.pads().Pressure(p_idx));
+                    }
+                } else {
+                    _hold_ticks[i] = 0;
+                    _string.SetVoiceSustain(i, false);
+                    _string.SetVoicePressure(i, 0.0f);
+                    _string.SetPadPressure(i, 0.0f);
+                }
+            }
+        } else {
+            _string.SetSustain(false);
+            for (uint8_t i = 0; i < 7; i++) {
+                uint16_t p_idx = i + kFirstNotePad;
+                float p = _touch.pads().IsTouched(p_idx) ? _touch.pads().Pressure(p_idx) : 0.0f;
+                _string.SetPadPressure(i, p);
+                _string.SetVoicePressure(i, 0.0f);
+            }
+        }
+    }
 
     // Pitch (real-time) ..........................................
     _string.SetTransp(_touch.knobs().s31().Process());
@@ -74,8 +148,12 @@ void StringUI::Process(DaisySeed& hw) {
     _string.SetPattern(pattern_amt);
     _string.SetPatternShift(shift_amt);
 
-    // Drive / volume compensation ................................
-    _string.SetDrive(_touch.knobs().s36().Process());
+    // Drive / volume compensation <-> External Input Volume (shifted with TO) ....
+    auto drive_fader_value = _touch.knobs().s36().Process();
+    auto drive_amt = _drive_value.Process(drive_fader_value, !_is_to_touched);
+    auto in_vol_amt = _in_vol_value.Process(drive_fader_value, _is_to_touched);
+    _string.SetDrive(drive_amt);
+    _string.SetInputVolume(in_vol_amt);
 
     hw.SetLed(_string.IsLatched());
 };
@@ -93,14 +171,17 @@ void StringUI::_on_pad_touch(uint16_t pad) {
         return;
     }
 
-    if (pad < kFirstNotePad || pad >= kFirstNotePad + kNotesCount - 1) return;
+    if (pad < kFirstNotePad || pad >= kFirstNotePad + String::kVoicesCount) return;
     auto note_num = pad - kFirstNotePad;
-    _string.NoteOn(note_num);
+    float vel = _touch.pads().Velocity(pad);
+    _hold_ticks[note_num] = 0;
+    _string.NoteOn(note_num, vel);
 };
 
 void StringUI::_on_pad_release(uint16_t pad) {
-    if (pad < kFirstNotePad || pad >= kFirstNotePad + kNotesCount) return;
+    if (pad < kFirstNotePad || pad >= kFirstNotePad + String::kVoicesCount) return;
     auto note_num = pad - kFirstNotePad;
+    _hold_ticks[note_num] = 0;
     _string.NoteOff(note_num);
 };
 

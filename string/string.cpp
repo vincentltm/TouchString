@@ -13,10 +13,14 @@ _damping              { 0.f },
 _human_note_chance    { 0 },
 _human_string_chance  { 0 },
 _volume               { 1.f },
-_is_arp_on            { false }
+_is_arp_on            { false },
+_exciter_mode         { 0 },
+_input_volume         { 0.f },
+_trans_mult           { 1.f }
 {
   _note_on.fill(false);
   _note_hold.fill(false);
+  _pad_pressure.fill(0.f);
   _reverb_in.fill(0.f);
   _reverb_out.fill(0.f);
   _bus.fill(0.f);
@@ -42,8 +46,12 @@ void String::Init(const float sample_rate, const float buffer_size) {
   _arp.SetDirection(ArpDirection::fwd);
   _arp.SetRandChance(0);
   _arp.SetAsPlayed(true);
+  _arp.SetNonLegato(true);
 
-  _vox.Init(sample_rate);
+  for (size_t i = 0; i < kVoicesCount; i++) {
+    _vox[i].Init(sample_rate, _scale.FreqAt(i), 123456789u + static_cast<uint32_t>(i) * 987654321u);
+  }
+
   _drive.Init();
 
   _reverb.Init(sample_rate);
@@ -55,15 +63,94 @@ void String::Init(const float sample_rate, const float buffer_size) {
 
 void String::SetLatch(const bool on) {
     _latch.set_on(on);
-    if (!_arp.HasNote()) Reset();
+    if (_is_arp_on && !_arp.HasNote()) Reset();
 };
 
-void String::NoteOn(const uint8_t num) {
-  if (!_is_arp_on) {
-    _humanize_and_apply();
-    _vox.NoteOn(_scale.FreqAt(num), 1.f);
-    return;
-  } 
+void String::SetScaleIndex(const uint8_t index) {
+  _scale.SetScaleIndex(index);
+  for (size_t i = 0; i < kVoicesCount; i++) {
+    _vox[i].SetFreq(_scale.FreqAt(i));
+  }
+}
+
+void String::SetTransp(const float value) {
+  _trans_mult = _scale.TransMult(value);
+  bool is_realtime = (_exciter_mode == 2) || (_input_volume > 0.005f);
+  for (size_t i = 0; i < kVoicesCount; i++) {
+    if (is_realtime || _vox[i].IsBowing() || !_vox[i].IsActive()) {
+      _vox[i].SetMult(_trans_mult);
+    }
+  }
+}
+
+void String::SetBrightness(const float value) {
+  _brightness = value;
+  for (auto& v : _vox) {
+    v.SetBrightness(value);
+  }
+}
+
+void String::SetStructure(const float value) {
+  _structure = value;
+  for (auto& v : _vox) {
+    v.SetStructure(value);
+  }
+}
+
+void String::SetDamping(const float value) {
+  _damping = value * .7f;
+  for (auto& v : _vox) {
+    v.SetDamping(_damping);
+  }
+}
+
+void String::SetVoicePressure(const uint8_t voice_num, const float pressure) {
+  if (voice_num < kVoicesCount) {
+    _vox[voice_num].SetBowPressure(pressure);
+  }
+}
+
+void String::SetVoiceSustain(const uint8_t voice_num, const bool sustain) {
+  if (voice_num < kVoicesCount) {
+    _vox[voice_num].SetSustain(sustain);
+  }
+}
+
+void String::SetBowPressure(const float pressure) {
+  for (auto& v : _vox) {
+    v.SetBowPressure(pressure);
+  }
+}
+
+void String::SetSustain(const bool sustain) {
+  for (auto& v : _vox) {
+    v.SetSustain(sustain);
+  }
+}
+
+void String::SetNoteFreq(const uint8_t note_num) {
+  if (note_num < kVoicesCount) {
+    _vox[note_num].SetFreq(_scale.FreqAt(note_num));
+  }
+}
+
+void String::NoteOn(const uint8_t num, const float velocity) {
+  if (num < kVoicesCount) {
+    _vox[num].SetMult(_trans_mult, false);
+    _pad_pressure[num] = velocity;
+    _humanize_and_apply(num);
+    if (!_is_arp_on) {
+      if (_exciter_mode == 2) {
+        _vox[num].SetFreq(_scale.FreqAt(num));
+        _vox[num].SetBowPressure(velocity);
+      } else {
+        _vox[num].SetSustain(false);
+        _vox[num].SetBowPressure(0.0f);
+        _vox[num].NoteOn(_scale.FreqAt(num), velocity);
+      }
+      return;
+    }
+  }
 
   _latch.note_on(num);
 
@@ -76,10 +163,20 @@ void String::NoteOn(const uint8_t num) {
 };
 
 void String::NoteOff(const uint8_t num) {
-  _latch.note_off(num);
+  if (num < kVoicesCount) {
+    _pad_pressure[num] = 0.0f;
+    _vox[num].SetAftertouch(0.0f);
+    if (!_is_arp_on) {
+      _vox[num].SetSustain(false);
+      _vox[num].SetBowPressure(0.0f);
+    }
+  }
 
-  if (!_arp.HasNote()) {
-    Reset();
+  if (_is_arp_on) {
+    _latch.note_off(num);
+    if (!_arp.HasNote()) {
+      Reset();
+    }
   }
 };
 
@@ -88,16 +185,38 @@ void String::Reset() {
   _trigger.Reset();
   _pattern.Reset();
   _arp.Clear();
+  _latch.clear();
+  for (auto& v : _vox) {
+    v.SetSustain(false);
+    v.SetBowPressure(0.0f);
+    v.SetAftertouch(0.0f);
+  }
 };
 
-void String::Process(float **out, size_t size) {
+void String::Process(const float * const *in, float **out, size_t size) {
   _clock.Tick();
   for (size_t i = 0; i < size; i++) {
-    _bus[0] = _bus[1] = _drive.Process(_vox.Process()) * _volume;
+    float ext_audio = 0.f;
+    if (in != nullptr && _input_volume > 0.005f) {
+      ext_audio = (in[0][i] + in[1][i]) * 0.5f * _input_volume;
+      ext_audio = daisysp::SoftLimit(ext_audio * 1.5f);
+    }
+
+    float sum_l = 0.f;
+    float sum_r = 0.f;
+    for (size_t v = 0; v < kVoicesCount; v++) {
+      float s = _vox[v].Process(ext_audio * 0.40f);
+      sum_l += s * kPanL[v];
+      sum_r += s * kPanR[v];
+    }
+    sum_l *= 0.65f;
+    sum_r *= 0.65f;
+    _bus[0] = _drive.Process(sum_l) * _volume;
+    _bus[1] = _drive.Process(sum_r) * _volume;
     _xfade.Process(0, 0, _bus[0], _bus[1], _reverb_in[0], _reverb_in[1]);
     _reverb.Process(_reverb_in[0], _reverb_in[1], &(_reverb_out[0]), &(_reverb_out[1]));
-    out[0][i] = daisysp::SoftLimit(_bus[0] + _reverb_out[0]) * .75f;
-    out[1][i] = daisysp::SoftLimit(_bus[1] + _reverb_out[1]) * .75f;
+    out[0][i] = daisysp::SoftLimit(_bus[0] + _reverb_out[0]);
+    out[1][i] = daisysp::SoftLimit(_bus[1] + _reverb_out[1]);
   }
 };
 
@@ -117,10 +236,37 @@ void String::_on_latch_note_off(uint8_t num)
 }
 
 void String::_on_arp_note_on(uint8_t num, uint8_t vel) {
+  if (num >= kVoicesCount) return;
+  _vox[num].SetMult(_trans_mult, false);
   auto freq = _is_arp_on ? _humanized_note_freq(num) : _scale.FreqAt(num);
-  _humanize_and_apply();
-  _vox.NoteOn(freq, 1.f);
+  _humanize_and_apply(num);
+  float p = _pad_pressure[num];
+  float pluck_vel = (p > 0.05f) ? daisysp::fclamp(sqrtf(p), 0.25f, 1.0f) : 0.85f;
+
+  if (_exciter_mode == 2) {
+    // Bow mode: soft strike transient + rich bowing excitation
+    _vox[num].NoteOn(freq, pluck_vel * 0.40f);
+    _vox[num].SetBowPressure(pluck_vel);
+    _vox[num].SetSustain(true);
+  } else if (_exciter_mode == 1) {
+    // Pluck + Bow mode: full pluck strike + warm bowed sustain cushion
+    _vox[num].NoteOn(freq, pluck_vel);
+    _vox[num].SetBowPressure(pluck_vel * 0.65f);
+    _vox[num].SetSustain(true);
+  } else {
+    // Pure Pluck mode: crisp pluck strike, zero bow pressure
+    _vox[num].SetSustain(false);
+    _vox[num].SetBowPressure(0.0f);
+    _vox[num].NoteOn(freq, pluck_vel);
+  }
 };
+
+void String::_on_arp_note_off(uint8_t num) {
+  if (num < kVoicesCount) {
+    _vox[num].SetBowPressure(0.0f);
+    _vox[num].SetSustain(false);
+  }
+}
 
 float String::_humanized_note_freq(uint8_t note) {
   auto freq = _scale.FreqAt(note);
@@ -153,7 +299,11 @@ float String::_humanized_note_freq(uint8_t note) {
   }
 };
 
-void String::_humanize_and_apply() {
+void String::_humanize_and_apply(uint8_t voice_num) {
+  if (voice_num >= kVoicesCount) return;
+  float b = _brightness;
+  float s = _structure;
+  float d = _damping;
   if (_human_string_chance > 2) {
     auto chance_dice = _dice(_rand_engine);
     if (chance_dice < _human_string_chance) {
@@ -162,16 +312,16 @@ void String::_humanize_and_apply() {
       auto damping_dice = _dice(_rand_engine);
 
       auto bright_delta = bright_dice * 0.002f;
-      _brightness = std::min(_brightness + bright_delta, 1.f);
+      b = std::min(b + bright_delta, 1.f);
 
       auto struct_delta = structure_dice * 0.002f;
-      _structure = std::min(_structure + struct_delta, 1.f);
+      s = std::min(s + struct_delta, 1.f);
 
       auto damping_delta = damping_dice * 0.004f;
-      _damping = std::min(_damping - 0.004f + damping_delta, 8.f);
+      d = std::min(d - 0.004f + damping_delta, 8.f);
     }
   }
-  _vox.SetBrightness(_brightness);
-  _vox.SetStructure(_structure);
-  _vox.SetDamping(_damping);
+  _vox[voice_num].SetBrightness(b);
+  _vox[voice_num].SetStructure(s);
+  _vox[voice_num].SetDamping(d);
 };

@@ -16,6 +16,11 @@ public:
 
     bool on() const { return _on; }
 
+    void clear() {
+        _note_on.reset();
+        _note_hold.reset();
+    }
+
     void set_on(const bool on) { 
         auto was_on = _on;
         _on = on;

@@ -15,8 +15,12 @@ public:
     StringUI(Touch& touch, String& string):
     _touch { touch },
     _string { string },
-    _scale_index { 0 }
-     {}
+    _scale_index { 0 },
+    _exciter_mode { 0 },
+    _was_arp_on { false }
+     {
+         _hold_ticks.fill(0);
+     }
 
     ~StringUI() {}
 
@@ -51,6 +55,8 @@ private:
     MValue _human_string_value;
     MValue _pattern_value;
     MValue _shift_value;
+    MValue _drive_value;
+    MValue _in_vol_value;
 
     static constexpr uint8_t kNotesCount = 8;
     static constexpr uint16_t kFirstNotePad = 3;
@@ -58,6 +64,9 @@ private:
     uint8_t _scale_index;
     bool _is_to_touched;
     bool _is_ch_touched;
+    std::array<uint16_t, 7> _hold_ticks;
+    int _exciter_mode;
+    bool _was_arp_on;
 };
 
 };
