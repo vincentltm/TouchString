@@ -24,6 +24,7 @@ public:
             _debounce_cnt[i] = 0;
             _strike_window[i] = 0;
             _strike_peak_delta[i] = 0;
+            _release_lockout[i] = 0;
             _pad_max_delta[i] = kDefaultMaxDeltas[i];
         }
     }
@@ -72,6 +73,7 @@ private:
     std::array<uint8_t, 12> _debounce_cnt;
     std::array<uint8_t, 12> _strike_window;
     std::array<int32_t, 12> _strike_peak_delta;
+    std::array<uint8_t, 12> _release_lockout;
 
     std::function<void(uint16_t pad)> _on_touch;
     std::function<void(uint16_t pad)> _on_release;

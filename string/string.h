@@ -55,13 +55,14 @@ public:
   bool IsMono() const { return _is_mono; }
   void SetMono(const bool mono);
   void ToggleMono() { SetMono(!_is_mono); }
-  uint8_t ActiveMonoVoice() const { return _active_mono_voice; }
+  int8_t ActiveMonoPad() const { return (_mono_stack_size > 0) ? static_cast<int8_t>(_mono_stack[_mono_stack_size - 1]) : -1; }
 
   void NoteOn(const uint8_t note_num, const float velocity = 1.f);
   void NoteOff(const uint8_t note_num);
 
   void SetVoicePressure(const uint8_t voice_num, const float pressure);
   void SetVoiceSustain(const uint8_t voice_num, const bool sustain);
+  void SetVoiceAftertouch(const uint8_t voice_num, const float pressure);
 
   void SetBowPressure(const float pressure);
   void SetSustain(const bool sustain);
@@ -173,7 +174,6 @@ private:
   float _trans_mult;
   std::array<float, kVoicesCount> _pad_pressure;
   bool _is_mono;
-  uint8_t _active_mono_voice;
   std::array<uint8_t, kVoicesCount> _mono_stack;
   uint8_t _mono_stack_size;
 

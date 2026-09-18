@@ -99,44 +99,36 @@ void StringUI::Process(DaisySeed& hw) {
             _string.SetPadPressure(i, _touch.pads().IsTouched(p_idx) ? _touch.pads().Pressure(p_idx) : 0.0f);
         }
     } else if (_string.IsMono()) {
-        uint8_t active = _string.ActiveMonoVoice();
-        if (_exciter_mode == 2) {
-            if (active < 7 && _touch.pads().IsTouched(active + kFirstNotePad)) {
-                _string.SetVoicePressure(active, _touch.pads().Pressure(active + kFirstNotePad));
-            } else if (active < 7) {
-                _string.SetVoicePressure(active, 0.0f);
-            }
-        } else if (_exciter_mode == 1) {
-            for (uint8_t i = 0; i < 7; i++) {
-                uint16_t p_idx = i + kFirstNotePad;
-                if (_touch.pads().IsTouched(p_idx)) {
-                    if (i == active) {
-                        _hold_ticks[i]++;
-                        if (_hold_ticks[i] > 6) {
-                            _string.SetVoicePressure(i, _touch.pads().Pressure(p_idx) * 0.65f);
-                            _string.SetVoiceSustain(i, true);
-                        } else {
-                            _string.SetPadPressure(i, _touch.pads().Pressure(p_idx));
-                        }
-                    } else {
-                        _hold_ticks[i] = 0;
-                        _string.SetVoiceSustain(i, false);
-                        _string.SetVoicePressure(i, 0.0f);
-                    }
+        int8_t active = _string.ActiveMonoPad();
+        if (active >= 0) {
+            uint16_t p_idx = active + kFirstNotePad;
+            float press = _touch.pads().IsTouched(p_idx) ? _touch.pads().Pressure(p_idx) : 0.0f;
+            _string.SetPadPressure(active, press);
+
+            if (_exciter_mode == 2) {
+                // Bow mode: hand pressure directly modulates bowing on single centered voice
+                _string.SetVoicePressure(0, press);
+            } else if (_exciter_mode == 1) {
+                // Pluck + Bow on hold
+                _hold_ticks[active]++;
+                if (_hold_ticks[active] > 6) {
+                    _string.SetVoicePressure(0, press * 0.65f);
+                    _string.SetVoiceSustain(0, true);
                 } else {
-                    _hold_ticks[i] = 0;
-                    _string.SetVoiceSustain(i, false);
-                    _string.SetVoicePressure(i, 0.0f);
-                    _string.SetPadPressure(i, 0.0f);
+                    _string.SetVoicePressure(0, 0.0f);
+                    _string.SetVoiceSustain(0, false);
                 }
+            } else {
+                _string.SetVoicePressure(0, 0.0f);
+                _string.SetVoiceSustain(0, false);
+                _string.SetVoiceAftertouch(0, press);
             }
         } else {
-            _string.SetSustain(false);
+            _string.SetVoicePressure(0, 0.0f);
+            _string.SetVoiceSustain(0, false);
+            _string.SetVoiceAftertouch(0, 0.0f);
             for (uint8_t i = 0; i < 7; i++) {
-                uint16_t p_idx = i + kFirstNotePad;
-                float p = (i == active && _touch.pads().IsTouched(p_idx)) ? _touch.pads().Pressure(p_idx) : 0.0f;
-                _string.SetPadPressure(i, p);
-                _string.SetVoicePressure(i, 0.0f);
+                _hold_ticks[i] = 0;
             }
         }
     } else {

@@ -37,7 +37,7 @@ void Pads::Init(DaisySeed& hw) {
     }
 
     WriteRegister(0x2B, 0x01);
-    WriteRegister(0x2C, 0x01);
+    WriteRegister(0x2C, 0x02);
     WriteRegister(0x2D, 0x0E);
     WriteRegister(0x2E, 0x00);
 
@@ -86,13 +86,19 @@ void Pads::Process() {
         int32_t delta = static_cast<int32_t>(base) - static_cast<int32_t>(filt);
         if (delta < 0) delta = 0;
 
+        if (_release_lockout[i] > 0) {
+            _release_lockout[i]--;
+        }
+
         if (raw_touched != was_touched) {
             if (raw_touched) {
-                _state |= mask;
-                state_changed = true;
-                _debounce_cnt[i] = 0;
-                _strike_window[i] = 4;
-                _strike_peak_delta[i] = delta;
+                if (_release_lockout[i] == 0) {
+                    _state |= mask;
+                    state_changed = true;
+                    _debounce_cnt[i] = 0;
+                    _strike_window[i] = 4;
+                    _strike_peak_delta[i] = delta;
+                }
             } else {
                 _debounce_cnt[i]++;
                 if (_debounce_cnt[i] >= 2) {
@@ -147,16 +153,18 @@ void Pads::Process() {
         } else {
             if (_strike_window[i] > 0) {
                 _strike_window[i] = 0;
-                float effective_max = _pad_max_delta[i] - 5.0f;
-                if (effective_max < 30.0f) effective_max = 30.0f;
+                if (_strike_peak_delta[i] > 20 && _release_lockout[i] == 0) {
+                    float effective_max = _pad_max_delta[i] - 5.0f;
+                    if (effective_max < 30.0f) effective_max = 30.0f;
 
-                float norm = static_cast<float>(_strike_peak_delta[i] - 5) / effective_max;
-                norm = daisysp::fclamp(norm, 0.0f, 1.0f);
+                    float norm = static_cast<float>(_strike_peak_delta[i] - 5) / effective_max;
+                    norm = daisysp::fclamp(norm, 0.0f, 1.0f);
 
-                _velocity[i] = daisysp::fclamp(sqrtf(norm), 0.15f, 1.0f);
-                _pressure[i] = 0.0f;
+                    _velocity[i] = daisysp::fclamp(sqrtf(norm), 0.15f, 1.0f);
+                    _pressure[i] = 0.0f;
 
-                if (_on_touch) _on_touch(i);
+                    if (_on_touch) _on_touch(i);
+                }
             }
 
             _pressure[i] += (0.0f - _pressure[i]) * 0.40f;
@@ -164,6 +172,7 @@ void Pads::Process() {
 
             if (state_changed && !raw_touched) {
                 _pressure[i] = 0.0f;
+                _release_lockout[i] = 8;
                 if (_on_release) _on_release(i);
             }
         }

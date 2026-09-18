@@ -18,7 +18,6 @@ _exciter_mode         { 0 },
 _input_volume         { 0.f },
 _trans_mult           { 1.f },
 _is_mono              { false },
-_active_mono_voice    { 0xff },
 _mono_stack_size      { 0 }
 {
   _mono_stack.fill(0);
@@ -34,10 +33,8 @@ void String::SetMono(const bool mono) {
   if (_is_mono != mono) {
     _is_mono = mono;
     _mono_stack_size = 0;
-    _active_mono_voice = 0xff;
     for (auto& v : _vox) {
-      v.SetBowPressure(0.0f);
-      v.SetSustain(false);
+      v.Reset();
     }
   }
 }
@@ -132,6 +129,12 @@ void String::SetVoiceSustain(const uint8_t voice_num, const bool sustain) {
   }
 }
 
+void String::SetVoiceAftertouch(const uint8_t voice_num, const float pressure) {
+  if (voice_num < kVoicesCount) {
+    _vox[voice_num].SetAftertouch(pressure);
+  }
+}
+
 void String::SetBowPressure(const float pressure) {
   for (auto& v : _vox) {
     v.SetBowPressure(pressure);
@@ -152,12 +155,10 @@ void String::SetNoteFreq(const uint8_t note_num) {
 
 void String::NoteOn(const uint8_t num, const float velocity) {
   if (num < kVoicesCount) {
-    _vox[num].SetMult(_trans_mult, false);
     _pad_pressure[num] = velocity;
-    _humanize_and_apply(num);
     if (!_is_arp_on) {
       if (_is_mono) {
-        // Manage mono note stack
+        // Manage mono note stack (last-note priority)
         bool already_in = false;
         for (uint8_t i = 0; i < _mono_stack_size; i++) {
           if (_mono_stack[i] == num) {
@@ -173,35 +174,28 @@ void String::NoteOn(const uint8_t num, const float velocity) {
           _mono_stack[_mono_stack_size++] = num;
         }
 
+        uint8_t target_pad = _mono_stack[_mono_stack_size - 1];
+        float freq = _scale.FreqAt(target_pad);
+        _vox[0].SetMult(_trans_mult, false);
+
         if (_exciter_mode == 2) {
-          // Bow mode: legato transition
-          if (_active_mono_voice < kVoicesCount && _vox[_active_mono_voice].IsBowing()) {
-            _vox[_active_mono_voice].SetFreq(_scale.FreqAt(num));
-            _vox[_active_mono_voice].SetBowPressure(velocity);
-          } else {
-            for (auto& v : _vox) {
-              v.SetBowPressure(0.0f);
-              v.SetSustain(false);
-            }
-            _active_mono_voice = num;
-            _vox[num].SetFreq(_scale.FreqAt(num));
-            _vox[num].SetBowPressure(velocity);
-          }
+          // Bow mode: legato portamento transition on single centered voice
+          _vox[0].SetFreq(freq);
+          _vox[0].SetBowPressure(velocity);
+        } else if (_exciter_mode == 1) {
+          // Pluck + Bow on hold
+          _vox[0].NoteOn(freq, velocity);
         } else {
-          // Pluck / Pluck+Bow mode: silence other voices and strike new note
-          for (size_t i = 0; i < kVoicesCount; i++) {
-            if (i != num) {
-              _vox[i].Reset();
-            }
-          }
-          _active_mono_voice = num;
-          _vox[num].SetSustain(false);
-          _vox[num].SetBowPressure(0.0f);
-          _vox[num].NoteOn(_scale.FreqAt(num), velocity);
+          // Pure Pluck mode: strike new note cleanly on single voice
+          _vox[0].SetSustain(false);
+          _vox[0].SetBowPressure(0.0f);
+          _vox[0].NoteOn(freq, velocity);
         }
         return;
       } else {
         // Poly mode
+        _vox[num].SetMult(_trans_mult, false);
+        _humanize_and_apply(num);
         if (_exciter_mode == 2) {
           _vox[num].SetFreq(_scale.FreqAt(num));
           _vox[num].SetBowPressure(velocity);
@@ -244,33 +238,28 @@ void String::NoteOff(const uint8_t num) {
 
         if (_mono_stack_size > 0) {
           // Legato return to top of stack
-          uint8_t prev_num = _mono_stack[_mono_stack_size - 1];
-          float prev_press = _pad_pressure[prev_num];
+          uint8_t prev_pad = _mono_stack[_mono_stack_size - 1];
+          float prev_freq = _scale.FreqAt(prev_pad);
+          float prev_press = _pad_pressure[prev_pad];
           if (prev_press < 0.2f) prev_press = 0.6f;
 
           if (_exciter_mode == 2) {
-            if (_active_mono_voice < kVoicesCount) {
-              _vox[_active_mono_voice].SetFreq(_scale.FreqAt(prev_num));
-              _vox[_active_mono_voice].SetBowPressure(prev_press);
-            } else {
-              _active_mono_voice = prev_num;
-              _vox[prev_num].SetFreq(_scale.FreqAt(prev_num));
-              _vox[prev_num].SetBowPressure(prev_press);
+            // Bow mode: legato glide to remaining held note
+            _vox[0].SetFreq(prev_freq);
+            _vox[0].SetBowPressure(prev_press);
+          } else if (_exciter_mode == 1) {
+            // Pluck+Bow mode: if already bowing, glide pitch; do NOT re-pluck!
+            if (_vox[0].IsBowing()) {
+              _vox[0].SetFreq(prev_freq);
+              _vox[0].SetBowPressure(prev_press * 0.65f);
             }
-          } else {
-            for (size_t i = 0; i < kVoicesCount; i++) {
-              if (i != prev_num) _vox[i].Reset();
-            }
-            _active_mono_voice = prev_num;
-            _vox[prev_num].NoteOn(_scale.FreqAt(prev_num), prev_press);
           }
+          // In pure Pluck mode (mode 0): never re-pluck on release!
         } else {
-          // Stack empty - silence
-          if (_active_mono_voice < kVoicesCount) {
-            _vox[_active_mono_voice].SetSustain(false);
-            _vox[_active_mono_voice].SetBowPressure(0.0f);
-          }
-          _active_mono_voice = 0xff;
+          // Stack empty - silence bow/sustain
+          _vox[0].SetSustain(false);
+          _vox[0].SetBowPressure(0.0f);
+          _vox[0].SetAftertouch(0.0f);
         }
         return;
       } else {
@@ -296,7 +285,6 @@ void String::Reset() {
   _arp.Clear();
   _latch.clear();
   _mono_stack_size = 0;
-  _active_mono_voice = 0xff;
   for (auto& v : _vox) {
     v.SetSustain(false);
     v.SetBowPressure(0.0f);
@@ -315,13 +303,20 @@ void String::Process(const float * const *in, float **out, size_t size) {
 
     float sum_l = 0.f;
     float sum_r = 0.f;
-    for (size_t v = 0; v < kVoicesCount; v++) {
-      float s = _vox[v].Process(ext_audio * 0.40f);
-      sum_l += s * kPanL[v];
-      sum_r += s * kPanR[v];
+    if (_is_mono) {
+      float s = _vox[0].Process(ext_audio * 0.40f);
+      sum_l = s * 0.7071f;
+      sum_r = s * 0.7071f;
+    } else {
+      for (size_t v = 0; v < kVoicesCount; v++) {
+        float s = _vox[v].Process(ext_audio * 0.40f);
+        sum_l += s * kPanL[v];
+        sum_r += s * kPanR[v];
+      }
+      sum_l *= 0.65f;
+      sum_r *= 0.65f;
     }
-    sum_l *= 0.65f;
-    sum_r *= 0.65f;
+
     _bus[0] = _drive.Process(sum_l) * _volume;
     _bus[1] = _drive.Process(sum_r) * _volume;
     _xfade.Process(0, 0, _bus[0], _bus[1], _reverb_in[0], _reverb_in[1]);
@@ -348,41 +343,41 @@ void String::_on_latch_note_off(uint8_t num)
 
 void String::_on_arp_note_on(uint8_t num, uint8_t vel) {
   if (num >= kVoicesCount) return;
+  uint8_t voice_idx = _is_mono ? 0 : num;
   if (_is_mono) {
-    for (size_t i = 0; i < kVoicesCount; i++) {
-      if (i != num) {
-        _vox[i].Reset();
-      }
+    for (size_t i = 1; i < kVoicesCount; i++) {
+      _vox[i].Reset();
     }
   }
-  _vox[num].SetMult(_trans_mult, false);
+  _vox[voice_idx].SetMult(_trans_mult, false);
   auto freq = _is_arp_on ? _humanized_note_freq(num) : _scale.FreqAt(num);
-  _humanize_and_apply(num);
+  _humanize_and_apply(voice_idx);
   float p = _pad_pressure[num];
   float pluck_vel = (p > 0.05f) ? daisysp::fclamp(sqrtf(p), 0.25f, 1.0f) : 0.85f;
 
   if (_exciter_mode == 2) {
     // Bow mode: soft strike transient + rich bowing excitation
-    _vox[num].NoteOn(freq, pluck_vel * 0.40f);
-    _vox[num].SetBowPressure(pluck_vel);
-    _vox[num].SetSustain(true);
+    _vox[voice_idx].NoteOn(freq, pluck_vel * 0.40f);
+    _vox[voice_idx].SetBowPressure(pluck_vel);
+    _vox[voice_idx].SetSustain(true);
   } else if (_exciter_mode == 1) {
     // Pluck + Bow mode: full pluck strike + warm bowed sustain cushion
-    _vox[num].NoteOn(freq, pluck_vel);
-    _vox[num].SetBowPressure(pluck_vel * 0.65f);
-    _vox[num].SetSustain(true);
+    _vox[voice_idx].NoteOn(freq, pluck_vel);
+    _vox[voice_idx].SetBowPressure(pluck_vel * 0.65f);
+    _vox[voice_idx].SetSustain(true);
   } else {
     // Pure Pluck mode: crisp pluck strike, zero bow pressure
-    _vox[num].SetSustain(false);
-    _vox[num].SetBowPressure(0.0f);
-    _vox[num].NoteOn(freq, pluck_vel);
+    _vox[voice_idx].SetSustain(false);
+    _vox[voice_idx].SetBowPressure(0.0f);
+    _vox[voice_idx].NoteOn(freq, pluck_vel);
   }
 };
 
 void String::_on_arp_note_off(uint8_t num) {
-  if (num < kVoicesCount) {
-    _vox[num].SetBowPressure(0.0f);
-    _vox[num].SetSustain(false);
+  uint8_t voice_idx = _is_mono ? 0 : num;
+  if (voice_idx < kVoicesCount) {
+    _vox[voice_idx].SetBowPressure(0.0f);
+    _vox[voice_idx].SetSustain(false);
   }
 }
 

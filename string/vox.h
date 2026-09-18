@@ -319,7 +319,7 @@ public:
   void SetFreq(float freq) {
     _base_freq = freq;
     _target_freq = freq;
-    if (!_is_active) {
+    if (!_is_active || !_is_bowing) {
       _current_freq = freq;
       _update_freq_internal(freq);
     }
@@ -418,7 +418,8 @@ public:
     }
 
     if (fabsf(_target_freq - _current_freq) > 0.01f) {
-      _current_freq += (_target_freq - _current_freq) * 0.02f;
+      float slew = _is_bowing ? 0.0018f : 0.02f;
+      _current_freq += (_target_freq - _current_freq) * slew;
       _update_freq_internal(_current_freq);
     }
 
