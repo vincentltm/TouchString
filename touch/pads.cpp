@@ -26,42 +26,52 @@ void Pads::Init(DaisySeed& hw) {
     i2c_conf.pin_config.sda = Pin(PORTB, 9);
     _i2c.Init(i2c_conf);
 
+    // Soft reset
     WriteRegister(0x80, 0x63);
     System::Delay(5);
 
+    // Stop mode to configure registers
     WriteRegister(0x5E, 0x00);
 
+    // Touch and Release thresholds for all 12 electrodes
     for (uint8_t i = 0; i < 12; i++) {
-        WriteRegister(0x41 + i * 2, 6);
-        WriteRegister(0x42 + i * 2, 3);
+        WriteRegister(0x41 + i * 2, 6); // ELEx Touch threshold
+        WriteRegister(0x42 + i * 2, 3); // ELEx Release threshold
     }
 
-    WriteRegister(0x2B, 0x01);
-    WriteRegister(0x2C, 0x02);
-    WriteRegister(0x2D, 0x0E);
-    WriteRegister(0x2E, 0x00);
+    // Debounce configuration
+    WriteRegister(0x2B, 0x01); // Debounce Touch: 1 sample
+    WriteRegister(0x2C, 0x02); // Debounce Release: 2 samples
 
-    WriteRegister(0x2F, 0x01);
-    WriteRegister(0x30, 0x01);
-    WriteRegister(0x31, 0x10);
-    WriteRegister(0x32, 0x04);
+    // Filter configuration (Rising / Touch)
+    WriteRegister(0x2D, 0x0E); // MHD_R: Max Half Delta Rising
+    WriteRegister(0x2E, 0x00); // NHD_R: Noise Half Delta Rising
+    WriteRegister(0x2F, 0x01); // NCL_R: Noise Count Limit Rising
+    WriteRegister(0x30, 0x01); // FDL_R: Filter Delay Limit Rising
 
-    WriteRegister(0x33, 0x00);
-    WriteRegister(0x34, 0x00);
-    WriteRegister(0x35, 0x00);
+    // Filter configuration (Falling / Release)
+    WriteRegister(0x31, 0x10); // MHD_F: Max Half Delta Falling
+    WriteRegister(0x32, 0x04); // NHD_F: Noise Half Delta Falling
+    WriteRegister(0x33, 0x00); // NCL_F: Noise Count Limit Falling
+    WriteRegister(0x34, 0x00); // FDL_F: Filter Delay Limit Falling
 
-    WriteRegister(0x5B, 0x11);
+    // Touched filter configuration
+    WriteRegister(0x35, 0x00); // NHD_T
 
-    WriteRegister(0x5C, 0x50);
-    WriteRegister(0x5D, 0x41);
+    // Electrode charge current & charge time configuration
+    WriteRegister(0x5B, 0x11); // CDC: Charge Discharge Current (16 uA)
+    WriteRegister(0x5C, 0x50); // CDT: Charge Discharge Time (1 us)
+    WriteRegister(0x5D, 0x41); // Filter / Global CDT
 
-    WriteRegister(0x7D, 200);
-    WriteRegister(0x7E, 130);
-    WriteRegister(0x7F, 180);
+    // Auto-configuration registers
+    WriteRegister(0x7D, 200);  // USL: Upper search limit
+    WriteRegister(0x7E, 130);  // LSL: Lower search limit
+    WriteRegister(0x7F, 180);  // TL: Target level
 
-    WriteRegister(0x7B, 0x4B);
-    WriteRegister(0x7C, 0x00);
+    WriteRegister(0x7B, 0x4B); // Auto-configuration control 0
+    WriteRegister(0x7C, 0x00); // Auto-configuration control 1
 
+    // Run mode: 12 electrodes enabled, baseline tracking active
     WriteRegister(0x5E, 0x8C);
     System::Delay(80);
 }

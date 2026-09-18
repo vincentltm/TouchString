@@ -23,6 +23,8 @@ public:
     }
   }
 
+  // Map the 7 hardware voice touchpads (P03..P09) across the 8-note scale so
+  // Pad 9 resolves to the scale's octave tonic (index 7) rather than stopping short.
   static constexpr std::array<uint8_t, 7> kVoiceToScaleIndex = { 0, 1, 2, 3, 4, 5, 7 };
 
   float TransMult(const float value) {

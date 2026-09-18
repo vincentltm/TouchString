@@ -60,12 +60,8 @@ void StringUI::Process(DaisySeed& hw) {
         _string.SetHumanStringChance(initial_s35);
     }
 
-    // Arp mode / latch ..........................................
+    // Arpeggiator (Switch 2 / Right switch) .....................
     auto switch_value = _touch.switches().A();
-    std::array<bool, kNotesCount> touched;
-    for (uint8_t i = 0; i < kNotesCount; i++) {
-        touched[i] = _touch.pads().IsTouched(i + kFirstNotePad);
-    }
 
     // Exciter mode (Switch 1 / Left switch) .....................
     auto exciter_switch = _touch.switches().B();
