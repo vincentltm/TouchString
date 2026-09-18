@@ -105,6 +105,7 @@ void String::SetTransp(const float value) {
 }
 
 void String::SetDampenPad(const bool active, const float pressure) {
+  if (active == _is_dampen_active && !active) return;
   _is_dampen_active = active;
   _dampen_pressure = active ? pressure : 0.0f;
   if (active) {
@@ -220,7 +221,7 @@ void String::NoteOn(const uint8_t num, const float velocity) {
         if (_exciter_mode == 2) {
           // Bow mode: legato portamento transition on single centered voice
           _vox[0].SetFreq(freq);
-          _vox[0].BowStroke(velocity);
+          _vox[0].SetBowPressure(velocity);
         } else if (_exciter_mode == 1) {
           // Pluck + Bow on hold
           _vox[0].NoteOn(freq, velocity);
@@ -239,7 +240,7 @@ void String::NoteOn(const uint8_t num, const float velocity) {
         _humanize_and_apply(num);
         if (_exciter_mode == 2) {
           _vox[num].SetFreq(freq);
-          _vox[num].BowStroke(velocity);
+          _vox[num].SetBowPressure(velocity);
         } else {
           _vox[num].SetSustain(false);
           _vox[num].SetBowPressure(0.0f);
@@ -404,21 +405,24 @@ void String::_on_arp_note_on(uint8_t num, uint8_t vel) {
   auto freq = base_f * _voice_oct_mult[num];
   _humanize_and_apply(voice_idx);
   float p = _pad_pressure[num];
-  float pluck_vel = (p > 0.05f) ? daisysp::fclamp(sqrtf(p), 0.25f, 1.0f) : 0.85f;
 
   if (_exciter_mode == 2) {
-    // Pure Bow mode: zero pluck strike, pure acoustic stick-slip bowing excitation.
-    // In Mono mode, frequency glides with portamento. In Poly mode, strings ring out in bariolage.
+    // Pure Bow mode: musical, singing stick-slip bowing excitation.
+    // Moderate, warm bow pressure (0.35 default when latched, scaling gently 0.24-0.60 with touch)
+    // without harsh over-pressing or helicopter chopping noise.
+    float bow_p = (p > 0.05f) ? (0.24f + 0.36f * daisysp::fclamp(p, 0.0f, 1.0f)) : 0.35f;
     _vox[voice_idx].SetFreq(freq);
-    _vox[voice_idx].BowStroke(pluck_vel);
+    _vox[voice_idx].SetBowPressure(bow_p);
     _vox[voice_idx].SetSustain(true);
   } else if (_exciter_mode == 1) {
     // Pluck + Bow mode: full pluck strike + warm bowed sustain cushion
+    float pluck_vel = (p > 0.05f) ? daisysp::fclamp(sqrtf(p), 0.25f, 1.0f) : 0.85f;
     _vox[voice_idx].NoteOn(freq, pluck_vel);
-    _vox[voice_idx].SetBowPressure(pluck_vel * 0.65f);
+    _vox[voice_idx].SetBowPressure(pluck_vel * 0.40f);
     _vox[voice_idx].SetSustain(true);
   } else {
     // Pure Pluck mode: crisp pluck strike, zero bow pressure
+    float pluck_vel = (p > 0.05f) ? daisysp::fclamp(sqrtf(p), 0.25f, 1.0f) : 0.85f;
     _vox[voice_idx].SetSustain(false);
     _vox[voice_idx].SetBowPressure(0.0f);
     _vox[voice_idx].NoteOn(freq, pluck_vel);

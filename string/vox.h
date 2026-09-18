@@ -240,7 +240,6 @@ public:
     _is_bowing { false },
     _bow_pressure { 0.f },
     _bow_env { 0.f },
-    _bow_stroke_accent { 0.f },
     _last_bow_update { 0.f },
     _rand_seed { 123456789 },
     _is_active { false },
@@ -268,7 +267,6 @@ public:
     _silent_samples = 0;
     _last_bow_update = 0.f;
     _last_string_out = 0.f;
-    _bow_stroke_accent = 0.f;
     SetStructure(0.5f);
     SetBrightness(0.5f);
     SetDamping(0.5f);
@@ -357,14 +355,7 @@ public:
   }
 
   void BowStroke(float pressure) {
-    _bow_pressure = daisysp::fclamp(pressure, 0.f, 1.f);
-    _is_bowing = (_bow_pressure > 0.001f);
-    if (_is_bowing) {
-      _is_active = true;
-      _silent_samples = 0;
-      // Organic bow stroke attack swell (~18% dynamic accent that decays naturally)
-      _bow_stroke_accent = 0.18f * _bow_pressure;
-    }
+    SetBowPressure(pressure);
   }
 
   bool IsActive() const { return _is_active; }
@@ -378,7 +369,6 @@ public:
     _is_bowing = false;
     _bow_pressure = 0.f;
     _bow_env = 0.f;
-    _bow_stroke_accent = 0.f;
     _remaining_impulse = 0;
     _silent_samples = 0;
     _aftertouch = 0.f;
@@ -439,14 +429,6 @@ public:
       _bow_env = 0.f;
     }
 
-    if (_bow_stroke_accent > 0.001f) {
-      _bow_stroke_accent *= 0.9982f;
-    } else {
-      _bow_stroke_accent = 0.0f;
-    }
-
-    float eff_bow = daisysp::fclamp(_bow_env + _bow_stroke_accent, 0.0f, 1.0f);
-
     if (fabsf(_bow_env - _last_bow_update) > 0.02f) {
       _last_bow_update = _bow_env;
       _update_bright_ratio();
@@ -464,14 +446,14 @@ public:
       _remaining_impulse--;
     }
 
-    if (eff_bow > 0.0001f) {
+    if (_bow_env > 0.0001f) {
       // Closed-loop non-linear stick-slip Helmholtz friction
-      float v_rel = eff_bow - 0.60f * _last_string_out;
+      float v_rel = _bow_env - 0.60f * _last_string_out;
       float friction = v_rel / (1.0f + 4.5f * (v_rel * v_rel));
-      float bow_force = friction * (eff_bow * 0.28f * _freq_scale);
+      float bow_force = friction * (_bow_env * 0.28f * _freq_scale);
 
-      // Acoustic rosin friction noise is purely continuous and proportional to bow force
-      float rosin = noise * (eff_bow * 0.08f * (0.35f + fabsf(v_rel)) * _freq_scale);
+      // Acoustic rosin friction noise is purely continuous, musical, and proportional to bow force
+      float rosin = noise * (_bow_env * 0.045f * (0.30f + fabsf(v_rel)) * _freq_scale);
       exc += bow_force + rosin;
     }
 
@@ -507,7 +489,7 @@ private:
   NOCOPY(Vox)
 
   __attribute__((noinline)) void _update_bright_ratio() {
-    float eff_accent = (_is_bowing || _bow_env > 0.001f) ? (_bow_env + _bow_stroke_accent) : _accent;
+    float eff_accent = (_is_bowing || _bow_env > 0.001f) ? _bow_env : _accent;
     float b = _brightness;
     float eff_b = b + 0.30f * eff_accent * (1.f - b);
     float range = 72.0f;
@@ -515,7 +497,7 @@ private:
   }
 
   __attribute__((noinline)) void _update_string_params() {
-    float eff_accent = (_is_bowing || _bow_env > 0.001f) ? (_bow_env + _bow_stroke_accent) : _accent;
+    float eff_accent = (_is_bowing || _bow_env > 0.001f) ? _bow_env : _accent;
     float b = _brightness;
     float eff_b = b + 0.30f * eff_accent * (1.f - b);
     float eff_d = _damping + 0.20f * eff_accent * (1.f - _damping);
@@ -533,7 +515,7 @@ private:
 
   __attribute__((noinline)) void _update_filter() {
     float f = 3.5f * _f0;
-    float bow_blend = daisysp::fclamp((_bow_env + _bow_stroke_accent) * 2.5f, 0.0f, 1.0f);
+    float bow_blend = daisysp::fclamp(_bow_env * 2.5f, 0.0f, 1.0f);
     float max_cutoff = 0.33f * (1.0f - bow_blend) + 0.09f * bow_blend;
     float cutoff = daisysp::fclamp(f * _bright_ratio, _f0 * 1.5f, max_cutoff);
     float cutoff_hz = cutoff * _sample_rate;
@@ -566,7 +548,6 @@ private:
   bool  _is_bowing;
   float _bow_pressure;
   float _bow_env;
-  float _bow_stroke_accent;
   float _last_bow_update;
   uint32_t _rand_seed;
 
