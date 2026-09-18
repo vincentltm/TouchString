@@ -8,9 +8,9 @@ Download the [binary file](https://github.com/Synthux-Academy/TouchString/releas
 <img src="touch.jpeg" width="300"/>
 
 ### Pads
-- **P00** (hold) - Octave Down (-1 oct) | Hold both P00 + P02 for Sub-bass (-2 oct)
+- **P00** - Keyboard Octave Down (steps down up to -2 octaves) | Tap both P00 + P02 to reset to unison (0)
 - **P01** - String Dampen Pad / Acoustic Choke (squeeze to damp ringing strings, tap to choke)
-- **P02** (hold) - Octave Up (+1 oct)
+- **P02** - Keyboard Octave Up (steps up up to +2 octaves) | Tap both P00 + P02 to reset to unison (0)
 - **P03...P09** - Note pads (strings 1 to 7)
 - **P10** - "TO" modifier | Hold to enable tempo control and alternative knob functions:
   - P10 + P00 - Tempo down
@@ -49,7 +49,7 @@ Download the [binary file](https://github.com/Synthux-Academy/TouchString/releas
 
 ### Polyphony & Expression
 - **Poly / Mono Modes**: Toggle with P11 + P01. In Poly mode, all 7 string voices run concurrently in stereo. In Mono mode, notes have last-note priority with centered stereo panning, smooth legato pitch gliding (~35 ms portamento) in Bow mode, and clean single-string damping in Pluck mode.
-- **Octave Hold Drone**: Octave shift is locked per voice when triggered. Holding P00 drops the current note by 1 octave, while releasing P00 allows subsequent plucked/bowed notes to play at standard pitch or +1 octave (P02). This enables holding a continuous bowed bass drone while playing higher melody notes!
+- **Keyboard Octave & Bass Drone / Melody**: Tapping P00 or P02 shifts the keyboard octave for subsequent notes. **Changing the keyboard octave does not affect already ringing or currently held notes.** This enables holding a pad (e.g. Pad 3) in Bow mode to establish a singing low-octave bass drone, tapping P02 to shift the keyboard up, and plucking higher strings concurrently—the drone continues playing undisturbed in its original octave!
 - **String Dampen / Acoustic Choke (P01)**: Squeezing P01 introduces strong acoustic damping across all strings to simulate palm-muting. Tapping P01 quickly silences ringing resonance.
 - **Velocity Sensitivity**: Pluck strike force affects attack volume and brightness.
 - **Aftertouch**: In Pluck mode, micro-rocking or squeezing a held pad bends pitch slightly (+25 cents) for finger vibrato. In Bow mode, pressure modulates bow friction and timbre.

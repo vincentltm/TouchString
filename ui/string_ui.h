@@ -16,6 +16,7 @@ public:
     _touch { touch },
     _string { string },
     _scale_index { 0 },
+    _octave_shift { 0 },
     _exciter_mode { 0 },
     _was_arp_on { false },
     _is_first_run { true },
@@ -43,6 +44,39 @@ private:
         _string.SetScaleIndex(_scale_index);
     }
 
+    void _octave_down() {
+        if (_octave_shift > -2) {
+            _octave_shift--;
+            _update_octave();
+            _led_blink_pattern = 3;
+            _led_blink_counter = 25;
+        }
+    }
+
+    void _octave_up() {
+        if (_octave_shift < 2) {
+            _octave_shift++;
+            _update_octave();
+            _led_blink_pattern = 3;
+            _led_blink_counter = 25;
+        }
+    }
+
+    void _octave_reset() {
+        if (_octave_shift != 0) {
+            _octave_shift = 0;
+            _update_octave();
+            _led_blink_pattern = 2;
+            _led_blink_counter = 50;
+        }
+    }
+
+    void _update_octave() {
+        static constexpr float kOctaveMults[5] = { 0.25f, 0.50f, 1.00f, 2.00f, 4.00f };
+        float mult = kOctaveMults[_octave_shift + 2];
+        _string.SetCurrentOctaveMult(mult);
+    }
+
     void _on_pad_touch(uint16_t pad);
     void _on_pad_release(uint16_t pad);
 
@@ -65,6 +99,7 @@ private:
     static constexpr uint16_t kFirstNotePad = 3;
 
     uint8_t _scale_index;
+    int8_t _octave_shift;
     bool _is_to_touched;
     bool _is_ch_touched;
     std::array<uint16_t, 7> _hold_ticks;

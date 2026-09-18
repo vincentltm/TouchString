@@ -229,6 +229,8 @@ void String::NoteOn(const uint8_t num, const float velocity) {
         }
         return;
       }
+    } else {
+      _voice_oct_mult[num] = _current_oct_mult;
     }
   }
 
@@ -308,7 +310,7 @@ void String::Reset() {
   _arp.Clear();
   _latch.clear();
   _mono_stack_size = 0;
-  _voice_oct_mult.fill(1.f);
+  _voice_oct_mult.fill(_current_oct_mult);
   for (auto& v : _vox) {
     v.SetSustain(false);
     v.SetBowPressure(0.0f);

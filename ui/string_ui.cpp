@@ -23,6 +23,9 @@ void StringUI::Init(daisy::DaisySeed& hw) {
     _drive_value.Set(0.f);
     _in_vol_value.Set(0.f);
 
+    _octave_shift = 0;
+    _update_octave();
+
     // Initialize MIDI //////////////////////////////////////////
     /////////////////////////////////////////////////////////////
     #ifdef USB_MIDI
@@ -91,21 +94,6 @@ void StringUI::Process(DaisySeed& hw) {
             }
         }
     }
-
-    // Octave hold pads (P00 = Octave Down, P02 = Octave Up)
-    float oct_mult = 1.0f;
-    if (!_is_to_touched && !_is_ch_touched) {
-        bool p00 = _touch.pads().IsTouched(0);
-        bool p02 = _touch.pads().IsTouched(2);
-        if (p00 && p02) {
-            oct_mult = 0.25f; // Sub-bass (-2 octaves)
-        } else if (p00) {
-            oct_mult = 0.50f; // -1 octave
-        } else if (p02) {
-            oct_mult = 2.00f; // +1 octave
-        }
-    }
-    _string.SetCurrentOctaveMult(oct_mult);
 
     // String Dampen Pad (P01)
     bool p01_touched = _touch.pads().IsTouched(1);
@@ -236,8 +224,13 @@ void StringUI::Process(DaisySeed& hw) {
                 led_on = true;
             }
         } else if (_led_blink_pattern == 2) {
-            // Poly: Single long blink
+            // Poly / Reset: Single long blink
             if (_led_blink_counter > 15) {
+                led_on = true;
+            }
+        } else if (_led_blink_pattern == 3) {
+            // Octave step: Quick flash
+            if (_led_blink_counter > 5) {
                 led_on = true;
             }
         }
@@ -248,15 +241,33 @@ void StringUI::Process(DaisySeed& hw) {
 };
 
 void StringUI::_on_pad_touch(uint16_t pad) {
-    // Scale & Tempo
+    // Scale, Tempo & Octave
     if (pad == 0) {
-        if (_is_to_touched) _string.SlowDown();
-        else if (_is_ch_touched) _prev_scale();
+        if (_is_to_touched) {
+            _string.SlowDown();
+        } else if (_is_ch_touched) {
+            _prev_scale();
+        } else {
+            if (_touch.pads().IsTouched(2)) {
+                _octave_reset();
+            } else {
+                _octave_down();
+            }
+        }
         return;
     }
     if (pad == 2) {
-        if (_is_to_touched) _string.SpeedUp();
-        else if (_is_ch_touched) _next_scale();
+        if (_is_to_touched) {
+            _string.SpeedUp();
+        } else if (_is_ch_touched) {
+            _next_scale();
+        } else {
+            if (_touch.pads().IsTouched(0)) {
+                _octave_reset();
+            } else {
+                _octave_up();
+            }
+        }
         return;
     }
     if (pad == 1) {
