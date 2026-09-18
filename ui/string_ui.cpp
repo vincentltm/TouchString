@@ -282,7 +282,8 @@ void StringUI::_on_pad_touch(uint16_t pad) {
 
     if (pad < kFirstNotePad || pad >= kFirstNotePad + String::kVoicesCount) return;
     auto note_num = pad - kFirstNotePad;
-    float vel = _touch.pads().Velocity(pad);
+    // In Bow mode, continuous pressure directly seeds bowing so feather touches swell smoothly from zero
+    float vel = (_exciter_mode == 2) ? _touch.pads().Pressure(pad) : _touch.pads().Velocity(pad);
     _hold_ticks[note_num] = 0;
     _string.NoteOn(note_num, vel);
 };

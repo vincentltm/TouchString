@@ -140,6 +140,7 @@ void Pads::Process() {
                 if (delta > _strike_peak_delta[i]) {
                     _strike_peak_delta[i] = delta;
                 }
+                _pressure[i] = target_p;
                 _strike_window[i]--;
 
                 bool peak_passed = (_strike_peak_delta[i] > 30 && delta < (_strike_peak_delta[i] - 12));
@@ -163,7 +164,7 @@ void Pads::Process() {
         } else {
             if (_strike_window[i] > 0) {
                 _strike_window[i] = 0;
-                if (_strike_peak_delta[i] > 20 && _release_lockout[i] == 0) {
+                if (_strike_peak_delta[i] >= 6 && _release_lockout[i] == 0) {
                     float effective_max = _pad_max_delta[i] - 5.0f;
                     if (effective_max < 30.0f) effective_max = 30.0f;
 
@@ -182,7 +183,7 @@ void Pads::Process() {
 
             if (state_changed && !raw_touched) {
                 _pressure[i] = 0.0f;
-                _release_lockout[i] = 8;
+                _release_lockout[i] = 3;
                 if (_on_release) _on_release(i);
             }
         }
