@@ -1,45 +1,63 @@
-# This is TouchString
+# This is TouchString(s)
+
+Polyphonic physical modeling string synthesizer for the Synthux Touch synthesizer and Daisy Seed.
 
 ## Quick Install
-Download the [binary file](https://github.com/Synthux-Academy/TouchString/releases/latest/download/TouchString.bin) and flash using the [Daisy Seed web programmer](https://electro-smith.github.io/Programmer/)
+Flash the precompiled [`TouchString.bin`](TouchString.bin) directly using the [Daisy Seed web programmer](https://electro-smith.github.io/Programmer/).
 
 ## Controls
 
 <img src="touch.jpeg" width="300"/>
 
 ### Pads
-- P10 + P00 - tempo down
-- P11 + P00 - previous scale
-- P10 + P02 - tempo up
-- P11 + P02 - next scale
-- P03...P09 - note pads
-- P10 - "TO" modifier | Hold to enable tempo control and alternative knob functions
-- P11 - "CH" modifier | Hold to enable scale selection
+- **P00** - Keyboard Octave Down (steps down up to -2 octaves) | Tap both P00 + P02 to reset to unison (0)
+- **P01** - String Dampen / Palm-Mute Choke (squeeze to damp ringing strings, tap to mute)
+- **P02** - Keyboard Octave Up (steps up up to +2 octaves) | Tap both P00 + P02 to reset to unison (0)
+- **P03...P09** - Note pads (strings 1 to 7)
+- **P10 (TO)** - Modifier | Hold for secondary functions:
+  - P10 + P00 - Tempo down
+  - P10 + P02 - Tempo up
+  - P10 + S33 - Pattern Shift
+  - P10 + S35 - Reverb Mix
+  - P10 + S36 - External Audio Input Volume
+- **P11 (CH)** - Modifier | Hold for scale and voice mode selection:
+  - P11 + P00 - Previous scale
+  - P11 + P02 - Next scale
+  - P11 + P01 - Poly / Mono toggle (LED double-blink = Mono, single blink = Poly)
 
 ### Knobs (clockwise)
-- S30 **Brightness** | Controls filter brightness/cutoff frequency
-- S31 **Pitch** | Global pitch transpose/tuning
-- S32 **Timbre** | Sound structure/harmonic content
-- S33 **Density** | Pattern density/complexity
-- S33 + TO (pad 10) **Pattern Shift**
-- S34 **Notes** | Humanization of note timing/variation
-- S35 **String Chance** | Probability of string triggering
-- S35 + TO (pad 10) **Reverb Mix**
+- S30 **Brightness** | Exciter filter cutoff & string brightness
+- S31 **Pitch** | Global tuning across ±1 octave (center = unison)
+- S32 **Timbre** | String structure / harmonic content
+- S33 **Density** | Arpeggiator pattern density (Hold TO: Pattern Shift)
+- S34 **Notes** | Arpeggiator note humanization
+- S35 **String Chance** | Trigger probability (Hold TO: Reverb Mix)
 
 ### Faders
-- S36 (left) **Drive** | Distortion/overdrive amount (reduces volume as drive increases)
-- S37 (right) **Damp** | String damping/decay time
+- S36 (left) **Drive** | Master volume & overdrive (Hold TO: External Input Gain)
+- S37 (right) **Damp** | String decay sustain time / *bariolage* ring
 
 ### Switches
+- **Left Switch (S09/S10) — Exciter Mode**
+  - **Up**: Pluck (velocity-sensitive, whisper-quiet to snappy)
+  - **Center**: Pluck + Bow on hold (squeeze pad to swell into bowed sustain)
+  - **Down**: Bow (continuous stick-slip bowing & scratch sensitivity)
 
-- **A** (right)
-  - **Down**: Arpeggiator Off
-  - **Center**: Arpeggiator On
-  - **Up**: Arpeggiator Latched
+- **Right Switch (S07/S08) — Arpeggiator**
+  - **Up**: Latched
+  - **Center**: On (momentary)
+  - **Down**: Off
+
+### Polyphony & Expression
+- **Poly / Mono Modes**: Toggle with P11 + P01. In Poly mode, all 7 strings run in stereo. In Mono mode, notes have last-note priority with centered stereo panning and smooth portamento.
+- **Bowed Arpeggiator**: In Bow mode, Mono plays a seamless, singing slurred legato line across notes. In Poly mode, strings ring out together in harmonic *bariolage*.
+- **Keyboard Octaves & Bass Drones**: Tapping P00 or P02 shifts the keyboard for new notes without interrupting currently held notes. You can hold a low bass drone with one hand, shift octaves, and pluck high melodies over it.
+- **String Dampen (P01)**: Squeeze P01 for acoustic palm-muting across all strings, or tap it to silence resonance.
+- **Velocity Sensitivity**: Responsive kinetic tracking from whisper-quiet soft plucks to bright, punchy fortissimo.
+- **Aftertouch**: In Pluck mode, micro-rocking a held pad bends pitch slightly for acoustic finger vibrato. In Bow mode, pad pressure continuously modulates bow friction and timbre.
 
 ### LED Indicator
-
-The onboard LED lit when latch is active.
+The onboard LED shows arpeggiator latch status and confirms Poly/Mono toggling (double blink = Mono, single blink = Poly).
 
 ## Project Structure
 ```
