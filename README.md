@@ -3,7 +3,7 @@
 Polyphonic physical modeling string synthesizer for the Synthux Touch synthesizer and Daisy Seed.
 
 ## Quick Install
-Flash the precompiled [`TouchString.bin`](TouchString.bin) directly using the [Daisy Seed web programmer](https://electro-smith.github.io/Programmer/).
+Flash the precompiled [**TouchString.bin**](https://raw.githubusercontent.com/vincentltm/TouchString/main/TouchString.bin) directly using the [Daisy Seed web programmer](https://flash.daisy.audio/).
 
 ## Controls
 
@@ -21,8 +21,9 @@ Flash the precompiled [`TouchString.bin`](TouchString.bin) directly using the [D
   - P10 + S35 - Reverb Mix
   - P10 + S36 - External Audio Input Volume
 - **P11 (CH)** - Modifier | Hold for scale and voice mode selection:
-  - P11 + P00 - Previous scale
-  - P11 + P02 - Next scale
+  - P11 + P00 - Previous scale (cycles through all 7 scales)
+  - P11 + P02 - Next scale (cycles through all 7 scales)
+  - P11 + P03...P09 - Direct scale select (P03: Amara, P04: Oxalis, P05: Pigmy, P06: Major, P07: Natural Minor, P08: Minor Pentatonic, P09: Major Pentatonic)
   - P11 + P01 - Poly / Mono toggle (LED double-blink = Mono, single blink = Poly)
 
 ### Knobs (clockwise)
@@ -56,8 +57,18 @@ Flash the precompiled [`TouchString.bin`](TouchString.bin) directly using the [D
 - **Velocity Sensitivity**: Responsive kinetic tracking from whisper-quiet soft plucks to bright, punchy fortissimo.
 - **Aftertouch**: In Pluck mode, micro-rocking a held pad bends pitch slightly for acoustic finger vibrato. In Bow mode, pad pressure continuously modulates bow friction and timbre.
 
+### Scales
+Hold **P11 (CH)** and tap a note pad to jump directly to any scale, or use **P00 / P02** to cycle:
+- **P03 — Amara**: Celtic minor handpan tuning (`C3, G3, Bb3, C4, D4, Eb4, G4`)
+- **P04 — Oxalis**: Folk major handpan tuning (`C3, E3, F3, G3, A3, C4, F4`)
+- **P05 — Pigmy**: Dorian Pygmy minor tuning (`C3, D3, Eb3, G3, Bb3, C4, Eb4`)
+- **P06 — Major**: Diatonic Major (`C3, D3, E3, F3, G3, A3, C4`)
+- **P07 — Natural Minor**: Diatonic Minor (`C3, D3, Eb3, F3, G3, Ab3, C4`)
+- **P08 — Minor Pentatonic**: Blues & folk (`C3, Eb3, F3, G3, Bb3, C4, Eb4`)
+- **P09 — Major Pentatonic**: Bright & sweet (`C3, D3, E3, G3, A3, C4, D4`)
+
 ### LED Indicator
-The onboard LED shows arpeggiator latch status and confirms Poly/Mono toggling (double blink = Mono, single blink = Poly).
+The onboard LED shows arpeggiator latch status, confirms scale changes (quick flash), and confirms Poly/Mono toggling (double blink = Mono, single blink = Poly).
 
 ## Project Structure
 ```

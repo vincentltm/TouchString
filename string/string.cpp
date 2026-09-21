@@ -93,7 +93,7 @@ void String::SetLatch(const bool on) {
 void String::SetScaleIndex(const uint8_t index) {
   _scale.SetScaleIndex(index);
   for (size_t i = 0; i < kVoicesCount; i++) {
-    _vox[i].SetFreq(_scale.FreqAt(i));
+    _vox[i].SetFreq(_scale.FreqAt(i) * _voice_oct_mult[i]);
   }
 }
 

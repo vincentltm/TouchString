@@ -32,16 +32,30 @@ public:
     void Process(daisy::DaisySeed& hw);
 
 private:
-    void _next_scale() {
-        if (_scale_index == static_cast<uint8_t>(_string.ScalesCount() - 1)) return;
-        _scale_index ++;
+    void _set_scale(uint8_t index) {
+        if (index >= _string.ScalesCount()) return;
+        _scale_index = index;
         _string.SetScaleIndex(_scale_index);
+        _led_blink_pattern = 3;
+        _led_blink_counter = 20;
+    }
+
+    void _next_scale() {
+        _scale_index = (_scale_index + 1) % _string.ScalesCount();
+        _string.SetScaleIndex(_scale_index);
+        _led_blink_pattern = 3;
+        _led_blink_counter = 20;
     }
 
     void _prev_scale() {
-        if (_scale_index == 0) return;
-        _scale_index --;
+        if (_scale_index == 0) {
+            _scale_index = _string.ScalesCount() - 1;
+        } else {
+            _scale_index--;
+        }
         _string.SetScaleIndex(_scale_index);
+        _led_blink_pattern = 3;
+        _led_blink_counter = 20;
     }
 
     void _octave_down() {

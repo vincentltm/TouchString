@@ -17,15 +17,11 @@ public:
   }
 
   void SetScaleIndex(uint8_t index) {
-    if (index != _scale_index) {
+    if (index < kStringScalesCount && index != _scale_index) {
       _scale_index = index;
       _PrepareScale();
     }
   }
-
-  // Map the 7 hardware voice touchpads (P03..P09) across the 8-note scale so
-  // Pad 9 resolves to the scale's octave tonic (index 7) rather than stopping short.
-  static constexpr std::array<uint8_t, 7> kVoiceToScaleIndex = { 0, 1, 2, 3, 4, 5, 7 };
 
   float TransMult(const float value) {
     auto new_trans_index = static_cast<uint8_t>(value * (_trans.size() - 1) + 0.5f);
@@ -34,13 +30,12 @@ public:
   }
 
   float FreqAt(uint8_t idx) {
-    uint8_t scale_idx = (idx < kVoiceToScaleIndex.size()) ? kVoiceToScaleIndex[idx] : idx;
-    if (scale_idx >= kStringScaleSize) scale_idx = kStringScaleSize - 1;
-    return _scale[scale_idx];
+    if (idx >= kStringScaleSize) idx = kStringScaleSize - 1;
+    return _scale[idx];
   }
 
   float Random() {
-    std::uniform_int_distribution<uint8_t> note_distribution(0, 6);
+    std::uniform_int_distribution<uint8_t> note_distribution(0, kStringScaleSize - 1);
     return FreqAt(note_distribution(_rand_engine));
   }
 

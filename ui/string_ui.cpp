@@ -102,12 +102,13 @@ void StringUI::Process(DaisySeed& hw) {
     }
 
     // Continuous pressure handling for bowing / hold ...........
-    if (is_arp_on) {
-        for (uint8_t i = 0; i < 7; i++) {
-            uint16_t p_idx = i + kFirstNotePad;
-            _string.SetPadPressure(i, _touch.pads().IsTouched(p_idx) ? _touch.pads().Pressure(p_idx) : 0.0f);
-        }
-    } else if (_string.IsMono()) {
+    if (!ch_touched) {
+        if (is_arp_on) {
+            for (uint8_t i = 0; i < 7; i++) {
+                uint16_t p_idx = i + kFirstNotePad;
+                _string.SetPadPressure(i, _touch.pads().IsTouched(p_idx) ? _touch.pads().Pressure(p_idx) : 0.0f);
+            }
+        } else if (_string.IsMono()) {
         int8_t active = _string.ActiveMonoPad();
         if (active >= 0) {
             uint16_t p_idx = active + kFirstNotePad;
@@ -183,6 +184,7 @@ void StringUI::Process(DaisySeed& hw) {
                 _string.SetVoicePressure(i, 0.0f);
             }
         }
+    }
     }
 
     // Pitch (real-time) ..........................................
@@ -282,6 +284,10 @@ void StringUI::_on_pad_touch(uint16_t pad) {
     }
 
     if (pad < kFirstNotePad || pad >= kFirstNotePad + String::kVoicesCount) return;
+    if (_touch.pads().IsTouched(11) || _is_ch_touched) {
+        _set_scale(pad - kFirstNotePad);
+        return;
+    }
     auto note_num = pad - kFirstNotePad;
     // In Bow mode, continuous pressure directly seeds bowing so feather touches swell smoothly from zero
     float vel = (_exciter_mode == 2) ? _touch.pads().Pressure(pad) : _touch.pads().Velocity(pad);
