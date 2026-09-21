@@ -14,12 +14,13 @@ Flash the precompiled [**TouchString.bin** (v2.0.0)](https://github.com/vincentl
 - **P01** - String Dampen / Palm-Mute Choke (squeeze to damp ringing strings, tap to mute)
 - **P02** - Keyboard Octave Up (steps up up to +2 octaves) | Tap both P00 + P02 to reset to unison (0)
 - **P03...P09** - Note pads (strings 1 to 7)
-- **P10 (TO)** - Modifier | Hold for secondary functions:
-  - P10 + P00 - Tempo down
-  - P10 + P02 - Tempo up
-  - P10 + S33 - Pattern Shift
-  - P10 + S35 - Reverb Mix
-  - P10 + S36 - External Audio Input Volume
+- **P10 (TO)** - Tap tempo & Modifier:
+  - **Tap P10** in rhythm to set arpeggiator tempo (40–240 BPM)
+  - Hold P10 + P00 - Tempo down
+  - Hold P10 + P02 - Tempo up
+  - Hold P10 + S33 - Pattern Shift
+  - Hold P10 + S35 - Reverb Mix
+  - Hold P10 + S36 - External Audio Input Volume
 - **P11 (CH)** - Modifier | Hold for scale and voice mode selection:
   - P11 + P00 - Previous scale (cycles through all 7 scales)
   - P11 + P02 - Next scale (cycles through all 7 scales)
@@ -68,7 +69,17 @@ Hold **P11 (CH)** and tap a note pad to jump directly to any scale, or use **P00
 - **P09 — Major Pentatonic**: Bright & sweet (`C3, D3, E3, G3, A3, C4, D4`)
 
 ### LED Indicator
-The onboard LED shows arpeggiator latch status, confirms scale changes (quick flash), and confirms Poly/Mono toggling (double blink = Mono, single blink = Poly).
+The onboard LED provides rich visual feedback:
+- **Visual Tempo Pulse**: When arpeggiator is active:
+  - *Momentary Arp*: Pulses ON in rhythm with each quarter-note beat.
+  - *Latched Arp*: Solid ON, dipping OFF briefly with each quarter-note beat.
+- **Scale Confirmation**: Blinks $N$ times corresponding to scale 1 through 7 (Amara = 1 blink, ..., Major Pentatonic = 7 blinks).
+- **Octave Shift**:
+  - *Unison (0)*: 1 solid medium confirmation blink
+  - *+1 / +2 Octaves*: 2 or 3 quick crisp blinks
+  - *-1 / -2 Octaves*: 1 or 2 slow pulses
+- **Voice Mode**: Double blink = Mono, single long blink = Poly.
+- **Tap Tempo**: Flashes instantly on valid taps to confirm tempo sync.
 
 ## Project Structure
 ```
