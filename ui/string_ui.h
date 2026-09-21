@@ -20,8 +20,13 @@ public:
     _exciter_mode { 0 },
     _was_arp_on { false },
     _is_first_run { true },
-    _led_blink_counter { 0 },
-    _led_blink_pattern { 0 }
+    _blink_pulses_remaining { 0 },
+    _blink_pulse_timer { 0 },
+    _blink_on_ticks { 0 },
+    _blink_off_ticks { 0 },
+    _blink_is_on { false },
+    _beat_pulse_timer { 0 },
+    _last_to_touch_time { 0 }
      {
          _hold_ticks.fill(0);
      }
@@ -32,19 +37,49 @@ public:
     void Process(daisy::DaisySeed& hw);
 
 private:
+    void _trigger_blink_pattern(uint8_t count, uint8_t on_ticks, uint8_t off_ticks) {
+        _blink_pulses_remaining = count;
+        _blink_on_ticks = on_ticks;
+        _blink_off_ticks = off_ticks;
+        _blink_is_on = true;
+        _blink_pulse_timer = on_ticks;
+    }
+
+    void _trigger_scale_blinks(uint8_t scale_idx) {
+        // Blink 1 to 7 times for scale 1 to 7 (28ms on, 28ms off per blink)
+        _trigger_blink_pattern(scale_idx + 1, 7, 7);
+    }
+
+    void _trigger_octave_blinks() {
+        if (_octave_shift == 0) {
+            // Unison: 1 solid medium confirmation blink (~140ms)
+            _trigger_blink_pattern(1, 35, 0);
+        } else if (_octave_shift == 1) {
+            // +1 Octave: 2 quick crisp blinks
+            _trigger_blink_pattern(2, 6, 6);
+        } else if (_octave_shift == 2) {
+            // +2 Octaves: 3 quick crisp blinks
+            _trigger_blink_pattern(3, 6, 6);
+        } else if (_octave_shift == -1) {
+            // -1 Octave: 1 slow pulse
+            _trigger_blink_pattern(1, 16, 12);
+        } else if (_octave_shift == -2) {
+            // -2 Octaves: 2 slow pulses
+            _trigger_blink_pattern(2, 16, 12);
+        }
+    }
+
     void _set_scale(uint8_t index) {
         if (index >= _string.ScalesCount()) return;
         _scale_index = index;
         _string.SetScaleIndex(_scale_index);
-        _led_blink_pattern = 3;
-        _led_blink_counter = 20;
+        _trigger_scale_blinks(_scale_index);
     }
 
     void _next_scale() {
         _scale_index = (_scale_index + 1) % _string.ScalesCount();
         _string.SetScaleIndex(_scale_index);
-        _led_blink_pattern = 3;
-        _led_blink_counter = 20;
+        _trigger_scale_blinks(_scale_index);
     }
 
     void _prev_scale() {
@@ -54,16 +89,14 @@ private:
             _scale_index--;
         }
         _string.SetScaleIndex(_scale_index);
-        _led_blink_pattern = 3;
-        _led_blink_counter = 20;
+        _trigger_scale_blinks(_scale_index);
     }
 
     void _octave_down() {
         if (_octave_shift > -2) {
             _octave_shift--;
             _update_octave();
-            _led_blink_pattern = 3;
-            _led_blink_counter = 25;
+            _trigger_octave_blinks();
         }
     }
 
@@ -71,8 +104,7 @@ private:
         if (_octave_shift < 2) {
             _octave_shift++;
             _update_octave();
-            _led_blink_pattern = 3;
-            _led_blink_counter = 25;
+            _trigger_octave_blinks();
         }
     }
 
@@ -80,8 +112,7 @@ private:
         if (_octave_shift != 0) {
             _octave_shift = 0;
             _update_octave();
-            _led_blink_pattern = 2;
-            _led_blink_counter = 50;
+            _trigger_octave_blinks();
         }
     }
 
@@ -120,8 +151,13 @@ private:
     int _exciter_mode;
     bool _was_arp_on;
     bool _is_first_run;
-    uint8_t _led_blink_counter;
-    uint8_t _led_blink_pattern;
+    uint8_t _blink_pulses_remaining;
+    uint8_t _blink_pulse_timer;
+    uint8_t _blink_on_ticks;
+    uint8_t _blink_off_ticks;
+    bool _blink_is_on;
+    uint8_t _beat_pulse_timer;
+    uint32_t _last_to_touch_time;
 };
 
 };

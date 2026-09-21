@@ -21,7 +21,9 @@ _is_mono              { false },
 _mono_stack_size      { 0 },
 _current_oct_mult     { 1.f },
 _is_dampen_active     { false },
-_dampen_pressure      { 0.f }
+_dampen_pressure      { 0.f },
+_clock_tick_counter   { 0 },
+_beat_pulse           { false }
 {
   _mono_stack.fill(0);
   _voice_oct_mult.fill(1.f);
@@ -89,6 +91,15 @@ void String::SetLatch(const bool on) {
     _latch.set_on(on);
     if (_is_arp_on && !_arp.HasNote()) Reset();
 };
+
+void String::SetBpm(const float bpm) {
+  _clock.SetBpm(bpm);
+  const auto clock_off_offset = 10.0f;
+  _tempo = (daisysp::fclamp(bpm, 40.0f, 240.0f) - 40.0f + clock_off_offset) / (200.0f - clock_off_offset);
+  _tempo = daisysp::fclamp(_tempo, 0.05f, 1.0f);
+  _clock_tick_counter = 0;
+  _beat_pulse = true;
+}
 
 void String::SetScaleIndex(const uint8_t index) {
   _scale.SetScaleIndex(index);
@@ -323,7 +334,9 @@ void String::NoteOff(const uint8_t num) {
 };
 
 void String::Reset() {
-  _clock.Stop();
+  if (!_is_arp_on) {
+    _clock.Stop();
+  }
   _trigger.Reset();
   _pattern.Reset();
   _arp.Clear();
@@ -378,6 +391,10 @@ void String::Process(const float * const *in, float **out, size_t size) {
 };
 
 void String::_on_clock_tick() {
+  _clock_tick_counter = (_clock_tick_counter + 1) % kPPQN;
+  if (_clock_tick_counter == 0) {
+    _beat_pulse = true;
+  }
   if (_trigger.Tick() && _pattern.Tick()) {
     _arp.Trigger();
   }

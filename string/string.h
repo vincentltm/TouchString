@@ -32,6 +32,12 @@ public:
   void Init(const float sample_rate, const float buffer_size);
 
   void SetTempo(const float tempo) { _clock.SetTempo(tempo); }
+  void SetBpm(const float bpm);
+  bool CheckBeatPulse() {
+    bool p = _beat_pulse;
+    _beat_pulse = false;
+    return p;
+  }
   void SpeedUp() {
     _tempo = std::min(_tempo + .05f, 1.f);
     SetTempo(_tempo);
@@ -47,6 +53,11 @@ public:
       Reset();
     }
     _is_arp_on = value;
+    if (_is_arp_on) {
+      if (!_clock.IsRunning()) _clock.Run();
+    } else {
+      _clock.Stop();
+    }
   }
 
   bool IsLatched() { return _latch.on(); }
@@ -185,6 +196,8 @@ private:
   float _dampen_pressure;
   daisysp::Svf _body_filter_l;
   daisysp::Svf _body_filter_r;
+  uint8_t _clock_tick_counter;
+  bool _beat_pulse;
 
   // Stereo panning mapped to physical touchpad layout:
   // Voice 0 (P03): Far Left,    Voice 1 (P04): Mid Left,     Voice 2 (P05): Center,

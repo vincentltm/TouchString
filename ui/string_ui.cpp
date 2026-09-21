@@ -219,29 +219,45 @@ void StringUI::Process(DaisySeed& hw) {
     _string.SetDrive(drive_amt);
     _string.SetInputVolume(in_vol_amt);
 
-    if (_led_blink_counter > 0) {
-        _led_blink_counter--;
-        bool led_on = false;
-        if (_led_blink_pattern == 1) {
-            // Mono: Double blink
-            if ((_led_blink_counter > 55) || (_led_blink_counter > 25 && _led_blink_counter <= 40)) {
-                led_on = true;
+    if (_string.CheckBeatPulse()) {
+        _beat_pulse_timer = 6; // ~24ms beat pulse
+    } else if (_beat_pulse_timer > 0) {
+        _beat_pulse_timer--;
+    }
+
+    bool led_state = false;
+    if (_blink_pulses_remaining > 0) {
+        if (_blink_is_on) {
+            led_state = true;
+            if (--_blink_pulse_timer == 0) {
+                _blink_is_on = false;
+                _blink_pulse_timer = _blink_off_ticks;
+                if (_blink_off_ticks == 0) {
+                    _blink_pulses_remaining--;
+                }
             }
-        } else if (_led_blink_pattern == 2) {
-            // Poly / Reset: Single long blink
-            if (_led_blink_counter > 15) {
-                led_on = true;
-            }
-        } else if (_led_blink_pattern == 3) {
-            // Octave step: Quick flash
-            if (_led_blink_counter > 5) {
-                led_on = true;
+        } else {
+            led_state = false;
+            if (--_blink_pulse_timer == 0) {
+                _blink_pulses_remaining--;
+                if (_blink_pulses_remaining > 0) {
+                    _blink_is_on = true;
+                    _blink_pulse_timer = _blink_on_ticks;
+                }
             }
         }
-        hw.SetLed(led_on);
     } else {
-        hw.SetLed(_string.IsLatched());
+        if (_string.IsLatched()) {
+            // Latched: Solid ON, dips OFF on each beat pulse
+            led_state = (_beat_pulse_timer == 0);
+        } else if (is_arp_on) {
+            // Momentary Arp: Pulses ON on each beat pulse
+            led_state = (_beat_pulse_timer > 0);
+        } else {
+            led_state = false;
+        }
     }
+    hw.SetLed(led_state);
 };
 
 void StringUI::_on_pad_touch(uint16_t pad) {
@@ -249,6 +265,7 @@ void StringUI::_on_pad_touch(uint16_t pad) {
     if (pad == 0) {
         if (_is_to_touched) {
             _string.SlowDown();
+            _trigger_blink_pattern(1, 8, 0);
         } else if (_is_ch_touched) {
             _prev_scale();
         } else {
@@ -263,6 +280,7 @@ void StringUI::_on_pad_touch(uint16_t pad) {
     if (pad == 2) {
         if (_is_to_touched) {
             _string.SpeedUp();
+            _trigger_blink_pattern(1, 8, 0);
         } else if (_is_ch_touched) {
             _next_scale();
         } else {
@@ -277,9 +295,26 @@ void StringUI::_on_pad_touch(uint16_t pad) {
     if (pad == 1) {
         if (_touch.pads().IsTouched(11) || _is_ch_touched) {
             _string.ToggleMono();
-            _led_blink_pattern = _string.IsMono() ? 1 : 2;
-            _led_blink_counter = 75;
+            if (_string.IsMono()) {
+                _trigger_blink_pattern(2, 10, 10); // Double blink = Mono
+            } else {
+                _trigger_blink_pattern(1, 28, 0);  // Single long blink = Poly
+            }
         }
+        return;
+    }
+    if (pad == 10) {
+        uint32_t now = daisy::System::GetNow();
+        uint32_t interval = now - _last_to_touch_time;
+        _last_to_touch_time = now;
+        if (interval >= 250 && interval <= 1500) {
+            float bpm = 60000.0f / static_cast<float>(interval);
+            _string.SetBpm(bpm);
+            _trigger_blink_pattern(1, 12, 0); // instant flash acknowledging tap
+        }
+        return;
+    }
+    if (pad == 11) {
         return;
     }
 
