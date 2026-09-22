@@ -14,7 +14,6 @@ _human_note_chance    { 0 },
 _human_string_chance  { 0 },
 _volume               { 1.f },
 _is_arp_on            { false },
-_drive_vel_scale      { 1.f },
 _exciter_mode         { 0 },
 _input_volume         { 0.f },
 _trans_mult           { 1.f },
@@ -26,11 +25,11 @@ _dampen_pressure      { 0.f },
 _clock_tick_counter   { 0 },
 _beat_pulse           { false }
 {
+  _bright_offset.fill(0.f);
+  _struct_offset.fill(0.f);
+  _damp_offset.fill(0.f);
   _mono_stack.fill(0);
   _voice_oct_mult.fill(1.f);
-  _human_bright_offset.fill(0.f);
-  _human_struct_offset.fill(0.f);
-  _human_damp_offset.fill(0.f);
   _note_on.fill(false);
   _note_hold.fill(false);
   _pad_pressure.fill(0.f);
@@ -75,9 +74,7 @@ void String::Init(const float sample_rate, const float buffer_size) {
     _vox[i].Init(sample_rate, _scale.FreqAt(i), 123456789u + static_cast<uint32_t>(i) * 987654321u);
   }
 
-  for (auto& d : _drive) {
-    d.Init();
-  }
+  _drive.Init();
 
   _body_filter_l.Init(sample_rate);
   _body_filter_r.Init(sample_rate);
@@ -129,9 +126,9 @@ void String::SetDampenPad(const bool active, const float pressure) {
     // In FastString: damping_ = 0.0 is dead muted (immediate decay), 1.0 is infinite sustain.
     // Squeezing P01 chokes the acoustic string decay down towards zero (palm mute).
     float choke = daisysp::fclamp(1.0f - 1.25f * pressure, 0.001f, 1.0f);
-    for (size_t i = 0; i < kVoicesCount; i++) {
-      float eff_d = daisysp::fclamp((_damping + _human_damp_offset[i]) * choke, 0.001f, 1.0f);
-      _vox[i].SetDamping(eff_d);
+    float eff_damping = _damping * choke;
+    for (auto& v : _vox) {
+      v.SetDamping(eff_damping);
     }
     if (pressure > 0.40f) {
       for (auto& v : _vox) {
@@ -140,9 +137,8 @@ void String::SetDampenPad(const bool active, const float pressure) {
       }
     }
   } else {
-    for (size_t i = 0; i < kVoicesCount; i++) {
-      float eff_d = daisysp::fclamp(_damping + _human_damp_offset[i], 0.001f, 1.0f);
-      _vox[i].SetDamping(eff_d);
+    for (auto& v : _vox) {
+      v.SetDamping(_damping);
     }
   }
 }
@@ -150,16 +146,14 @@ void String::SetDampenPad(const bool active, const float pressure) {
 void String::SetBrightness(const float value) {
   _brightness = value;
   for (size_t i = 0; i < kVoicesCount; i++) {
-    float eff_b = daisysp::fclamp(_brightness + _human_bright_offset[i], 0.0f, 1.0f);
-    _vox[i].SetBrightness(eff_b);
+    _vox[i].SetBrightness(daisysp::fclamp(value + _bright_offset[i], 0.f, 1.f));
   }
 }
 
 void String::SetStructure(const float value) {
   _structure = value;
   for (size_t i = 0; i < kVoicesCount; i++) {
-    float eff_s = daisysp::fclamp(_structure + _human_struct_offset[i], 0.0f, 1.0f);
-    _vox[i].SetStructure(eff_s);
+    _vox[i].SetStructure(daisysp::fclamp(value + _struct_offset[i], 0.f, 1.f));
   }
 }
 
@@ -167,8 +161,7 @@ void String::SetDamping(const float value) {
   _damping = value * .7f;
   if (!_is_dampen_active) {
     for (size_t i = 0; i < kVoicesCount; i++) {
-      float eff_d = daisysp::fclamp(_damping + _human_damp_offset[i], 0.001f, 1.0f);
-      _vox[i].SetDamping(eff_d);
+      _vox[i].SetDamping(daisysp::fclamp(_damping + _damp_offset[i], 0.f, 1.f));
     }
   }
 }
@@ -215,8 +208,7 @@ void String::SetNoteFreq(const uint8_t note_num) {
 
 void String::NoteOn(const uint8_t num, const float velocity) {
   if (num < kVoicesCount) {
-    float eff_vel = velocity * _drive_vel_scale;
-    _pad_pressure[num] = eff_vel;
+    _pad_pressure[num] = velocity;
     if (!_is_arp_on) {
       if (_is_mono) {
         // Manage mono note stack (last-note priority)
@@ -239,21 +231,20 @@ void String::NoteOn(const uint8_t num, const float velocity) {
         _voice_oct_mult[target_pad] = _current_oct_mult;
         float freq = _scale.FreqAt(target_pad) * _current_oct_mult;
         _vox[0].SetMult(_trans_mult, false);
+        _humanize_and_apply(0);
 
         if (_exciter_mode == 2) {
           // Bow mode: legato portamento transition on single centered voice
           _vox[0].SetFreq(freq);
-          _vox[0].SetBowPressure(eff_vel);
+          _vox[0].SetBowPressure(velocity);
         } else if (_exciter_mode == 1) {
           // Pluck + Bow on hold
-          _humanize_and_apply(0);
-          _vox[0].NoteOn(freq, eff_vel);
+          _vox[0].NoteOn(freq, velocity);
         } else {
           // Pure Pluck mode: strike new note cleanly on single voice
           _vox[0].SetSustain(false);
           _vox[0].SetBowPressure(0.0f);
-          _humanize_and_apply(0);
-          _vox[0].NoteOn(freq, eff_vel);
+          _vox[0].NoteOn(freq, velocity);
         }
         return;
       } else {
@@ -264,11 +255,11 @@ void String::NoteOn(const uint8_t num, const float velocity) {
         _humanize_and_apply(num);
         if (_exciter_mode == 2) {
           _vox[num].SetFreq(freq);
-          _vox[num].SetBowPressure(eff_vel);
+          _vox[num].SetBowPressure(velocity);
         } else {
           _vox[num].SetSustain(false);
           _vox[num].SetBowPressure(0.0f);
-          _vox[num].NoteOn(freq, eff_vel);
+          _vox[num].NoteOn(freq, velocity);
         }
         return;
       }
@@ -356,6 +347,9 @@ void String::Reset() {
   _latch.clear();
   _mono_stack_size = 0;
   _voice_oct_mult.fill(_current_oct_mult);
+  _bright_offset.fill(0.f);
+  _struct_offset.fill(0.f);
+  _damp_offset.fill(0.f);
   for (auto& v : _vox) {
     v.SetSustain(false);
     v.SetBowPressure(0.0f);
@@ -376,18 +370,16 @@ void String::Process(const float * const *in, float **out, size_t size) {
     float sum_r = 0.f;
     if (_is_mono) {
       float s = _vox[0].Process(ext_audio * 0.40f);
-      float driven = _drive[0].Process(s);
-      sum_l = driven * 0.7071f;
-      sum_r = driven * 0.7071f;
+      sum_l = s * 0.7071f;
+      sum_r = s * 0.7071f;
     } else {
       for (size_t v = 0; v < kVoicesCount; v++) {
         float s = _vox[v].Process(ext_audio * 0.40f);
-        float driven = _drive[v].Process(s);
-        sum_l += driven * kPanL[v];
-        sum_r += driven * kPanR[v];
+        sum_l += s * kPanL[v];
+        sum_r += s * kPanR[v];
       }
-      sum_l *= 0.85f;
-      sum_r *= 0.85f;
+      sum_l *= 0.65f;
+      sum_r *= 0.65f;
     }
 
     // Acoustic wooden body soundboard formant resonance (~310 Hz)
@@ -396,8 +388,8 @@ void String::Process(const float * const *in, float **out, size_t size) {
     sum_l = sum_l * 0.76f + _body_filter_l.Band() * 0.24f;
     sum_r = sum_r * 0.76f + _body_filter_r.Band() * 0.24f;
 
-    _bus[0] = sum_l * _volume;
-    _bus[1] = sum_r * _volume;
+    _bus[0] = _drive.Process(sum_l) * _volume;
+    _bus[1] = _drive.Process(sum_r) * _volume;
     _xfade.Process(0, 0, _bus[0], _bus[1], _reverb_in[0], _reverb_in[1]);
     _reverb.Process(_reverb_in[0], _reverb_in[1], &(_reverb_out[0]), &(_reverb_out[1]));
     out[0][i] = daisysp::SoftLimit(_bus[0] + _reverb_out[0]);
@@ -443,21 +435,18 @@ void String::_on_arp_note_on(uint8_t num, uint8_t vel) {
     // Moderate, warm bow pressure (0.35 default when latched, scaling gently 0.24-0.60 with touch)
     // without harsh over-pressing or helicopter chopping noise.
     float bow_p = (p > 0.05f) ? (0.24f + 0.36f * daisysp::fclamp(p, 0.0f, 1.0f)) : 0.35f;
-    bow_p *= (0.4f + 0.6f * _drive_vel_scale);
     _vox[voice_idx].SetFreq(freq);
     _vox[voice_idx].SetBowPressure(bow_p);
     _vox[voice_idx].SetSustain(true);
   } else if (_exciter_mode == 1) {
     // Pluck + Bow mode: full pluck strike + warm bowed sustain cushion
     float pluck_vel = (p > 0.05f) ? daisysp::fclamp(sqrtf(p), 0.25f, 1.0f) : 0.85f;
-    pluck_vel *= _drive_vel_scale;
     _vox[voice_idx].NoteOn(freq, pluck_vel);
     _vox[voice_idx].SetBowPressure(pluck_vel * 0.40f);
     _vox[voice_idx].SetSustain(true);
   } else {
     // Pure Pluck mode: crisp pluck strike, zero bow pressure
     float pluck_vel = (p > 0.05f) ? daisysp::fclamp(sqrtf(p), 0.25f, 1.0f) : 0.85f;
-    pluck_vel *= _drive_vel_scale;
     _vox[voice_idx].SetSustain(false);
     _vox[voice_idx].SetBowPressure(0.0f);
     _vox[voice_idx].NoteOn(freq, pluck_vel);
@@ -513,36 +502,28 @@ float String::_humanized_note_freq(uint8_t note) {
 
 void String::_humanize_and_apply(uint8_t voice_num) {
   if (voice_num >= kVoicesCount) return;
-  if (_human_string_chance > 2 && _exciter_mode != 2) {
+  if (_human_string_chance > 2) {
     auto chance_dice = _dice(_rand_engine);
     if (chance_dice < _human_string_chance) {
-      // Subtle, organic acoustic variations:
-      // +/- 0.03 for brightness and structure, +/- 0.02 for damping
-      int16_t bright_rnd = static_cast<int16_t>(_dice(_rand_engine)) - 50;
-      int16_t struct_rnd = static_cast<int16_t>(_dice(_rand_engine)) - 50;
-      int16_t damp_rnd   = static_cast<int16_t>(_dice(_rand_engine)) - 50;
+      auto bright_dice = _dice(_rand_engine);
+      auto structure_dice = _dice(_rand_engine);
+      auto damping_dice = _dice(_rand_engine);
 
-      _human_bright_offset[voice_num] = static_cast<float>(bright_rnd) * 0.0006f; // +/- 0.030
-      _human_struct_offset[voice_num] = static_cast<float>(struct_rnd) * 0.0006f; // +/- 0.030
-      _human_damp_offset[voice_num]   = static_cast<float>(damp_rnd)   * 0.0004f; // +/- 0.020
+      // Bipolar variations around center (dice 0..100 -> -50..+50)
+      _bright_offset[voice_num] = (static_cast<float>(bright_dice) - 50.f) * 0.003f;
+      _struct_offset[voice_num] = (static_cast<float>(structure_dice) - 50.f) * 0.003f;
+      _damp_offset[voice_num]   = (static_cast<float>(damping_dice) - 50.f) * 0.004f;
     } else {
-      _human_bright_offset[voice_num] = 0.0f;
-      _human_struct_offset[voice_num] = 0.0f;
-      _human_damp_offset[voice_num]   = 0.0f;
+      _bright_offset[voice_num] = 0.f;
+      _struct_offset[voice_num] = 0.f;
+      _damp_offset[voice_num]   = 0.f;
     }
   } else {
-    _human_bright_offset[voice_num] = 0.0f;
-    _human_struct_offset[voice_num] = 0.0f;
-    _human_damp_offset[voice_num]   = 0.0f;
+    _bright_offset[voice_num] = 0.f;
+    _struct_offset[voice_num] = 0.f;
+    _damp_offset[voice_num]   = 0.f;
   }
-  float b = daisysp::fclamp(_brightness + _human_bright_offset[voice_num], 0.0f, 1.0f);
-  float s = daisysp::fclamp(_structure + _human_struct_offset[voice_num], 0.0f, 1.0f);
-  float d = daisysp::fclamp(_damping + _human_damp_offset[voice_num], 0.001f, 1.0f);
-  if (_is_dampen_active) {
-    float choke = daisysp::fclamp(1.0f - 1.25f * _dampen_pressure, 0.001f, 1.0f);
-    d *= choke;
-  }
-  _vox[voice_num].SetBrightness(b);
-  _vox[voice_num].SetStructure(s);
-  _vox[voice_num].SetDamping(d);
+  _vox[voice_num].SetBrightness(daisysp::fclamp(_brightness + _bright_offset[voice_num], 0.f, 1.f));
+  _vox[voice_num].SetStructure(daisysp::fclamp(_structure + _struct_offset[voice_num], 0.f, 1.f));
+  _vox[voice_num].SetDamping(daisysp::fclamp(_damping + _damp_offset[voice_num], 0.f, 1.f));
 };

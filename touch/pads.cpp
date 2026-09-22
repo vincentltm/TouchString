@@ -34,47 +34,66 @@ void Pads::Init(DaisySeed& hw) {
     WriteRegister(0x5E, 0x00);
 
     // Touch and Release thresholds for all 12 electrodes
-    // Touch threshold = 10 counts: sensitive soft-touch response
-    // Release threshold = 6 counts: clean hysteresis, zero chatter, zero stuck pads
     for (uint8_t i = 0; i < 12; i++) {
-        WriteRegister(0x41 + i * 2, 10); // ELEx Touch threshold
-        WriteRegister(0x42 + i * 2, 6);  // ELEx Release threshold
+        WriteRegister(0x41 + i * 2, 6); // ELEx Touch threshold
+        WriteRegister(0x42 + i * 2, 3); // ELEx Release threshold
     }
 
-    // Filter configuration (Rising / Release): official NXP AN3891 & libDaisy
-    WriteRegister(0x2B, 0x01); // MHDR: Max Half Delta Rising
-    WriteRegister(0x2C, 0x01); // NHDR: Noise Half Delta Rising
-    WriteRegister(0x2D, 0x14); // NCLR: Noise Count Limit Rising
-    WriteRegister(0x2E, 0x80); // FDLR: Filter Delay Limit Rising
+    // Baseline Filter Configuration (NXP AN3891)
+    // Rising baseline filter (quick recovery when finger releases)
+    WriteRegister(0x2B, 0x01); // MHDR
+    WriteRegister(0x2C, 0x01); // NHDR
+    WriteRegister(0x2D, 0x0E); // NCLR
+    WriteRegister(0x2E, 0x00); // FDLR
 
-    // Filter configuration (Falling / Touch): official NXP AN3891 & libDaisy
-    WriteRegister(0x2F, 0x01); // MHDF: Max Half Delta Falling
-    WriteRegister(0x30, 0x05); // NHDF: Noise Half Delta Falling
-    WriteRegister(0x31, 0x01); // NCLF: Noise Count Limit Falling
-    WriteRegister(0x32, 0x80); // FDLF: Filter Delay Limit Falling
+    // Falling baseline filter (slow adaptation prevents finger press from being absorbed)
+    WriteRegister(0x2F, 0x01); // MHDF
+    WriteRegister(0x30, 0x01); // NHDF
+    WriteRegister(0x31, 0x10); // NCLF (16 consecutive samples)
+    WriteRegister(0x32, 0x04); // FDLF
 
-    // Touched filter configuration: baseline frozen during touch
-    WriteRegister(0x33, 0x00); // NHD_T
-    WriteRegister(0x34, 0x00); // NCL_T
-    WriteRegister(0x35, 0x00); // FDL_T
+    // Touched baseline filter
+    WriteRegister(0x33, 0x00); // NHDT
+    WriteRegister(0x34, 0x00); // NCLT
+    WriteRegister(0x35, 0x00); // FDLT
 
-    // Debounce configuration: register 0x5B
-    // bits [6:4] = Release debounce (2 samples = 0b010), bits [2:0] = Touch debounce (1 sample = 0b001)
-    WriteRegister(0x5B, 0x21);
+    // Debounce: 1 consecutive matching sample to confirm touch & release
+    WriteRegister(0x5B, 0x11);
 
-    // Electrode charge current & charge time configuration
-    WriteRegister(0x5C, 0x10); // CONFIG1: 16 uA charge current
-    WriteRegister(0x5D, 0x20); // CONFIG2: 0.5 us encoding, 1 ms sample period
+    // Analog Front-End (AFE) Configuration (NXP AN3889 / AN3890)
+    // CONFIG1 (0x5C): FFI = 11 (34 filter iterations for maximum noise rejection), CDC = 16uA seed
+    WriteRegister(0x5C, 0xD0);
 
-    // Run mode step 1: 12 electrodes enabled, initialize baseline from resting state
-    // 0x8C: CL = 10 (init baseline from first samples), 12 electrodes
+    // CONFIG2 (0x5D): CDT = 1uS (0b010 in bits 7:5), SFI = 10 (10 samples in bits 4:3), ESI = 2ms (0b001 in bits 2:0)
+    WriteRegister(0x5D, 0x51);
+
+    // Auto-Configuration Registers (NXP AN3889)
+    WriteRegister(0x7D, 200);  // USL: Upper search limit
+    WriteRegister(0x7E, 130);  // LSL: Lower search limit
+    WriteRegister(0x7F, 180);  // TL: Target level
+
+    WriteRegister(0x7B, 0xCB); // Auto-configuration control 0
+    WriteRegister(0x7C, 0x00); // Auto-configuration control 1
+
+    // Run mode: 12 electrodes enabled, baseline tracking active
     WriteRegister(0x5E, 0x8C);
     System::Delay(80);
+}
 
-    // Run mode step 2: Lock baseline tracking completely (CL = 00)
-    // Disables hardware baseline adaptation and auto-reconfiguration so touching all pads
-    // simultaneously never re-baselines over touched fingers, eliminating stuck pads!
-    WriteRegister(0x5E, 0x0C);
+void Pads::Recalibrate() {
+    WriteRegister(0x5E, 0x00);
+    System::Delay(5);
+    WriteRegister(0x5E, 0x8C);
+    System::Delay(80);
+    _state = 0;
+    for (size_t i = 0; i < 12; i++) {
+        _pressure[i] = 0.0f;
+        _velocity[i] = 0.0f;
+        _debounce_cnt[i] = 0;
+        _strike_window[i] = 0;
+        _strike_peak_delta[i] = 0;
+        _release_lockout[i] = 0;
+    }
 }
 
 void Pads::Process() {
@@ -96,6 +115,12 @@ void Pads::Process() {
 
         int32_t delta = static_cast<int32_t>(base) - static_cast<int32_t>(filt);
         if (delta < 0) delta = 0;
+
+        // Anti-stuck guard: if measured delta has fallen below release threshold (< 3),
+        // enforce raw_touched = false regardless of transient hardware register lag.
+        if (delta < 3) {
+            raw_touched = false;
+        }
 
         if (_release_lockout[i] > 0) {
             _release_lockout[i]--;
@@ -134,7 +159,7 @@ void Pads::Process() {
                 if (norm > 1.0f) norm = 1.0f;
                 if (norm < 0.0f) norm = 0.0f;
 
-                target_p = daisysp::fclamp(powf(norm, 1.25f), 0.0f, 1.0f);
+                target_p = norm * norm;
             }
 
             if (_strike_window[i] > 0) {
@@ -154,7 +179,8 @@ void Pads::Process() {
                     float norm = static_cast<float>(_strike_peak_delta[i] - 5) / effective_max;
                     norm = daisysp::fclamp(norm, 0.0f, 1.0f);
 
-                    _velocity[i] = daisysp::fclamp(sqrtf(norm), 0.03f, 1.0f);
+                    float vel = 0.35f * norm + 0.65f * sqrtf(norm);
+                    _velocity[i] = daisysp::fclamp(vel, 0.03f, 1.0f);
                     _pressure[i] = target_p;
 
                     if (_on_touch) _on_touch(i);
@@ -172,7 +198,8 @@ void Pads::Process() {
                     float norm = static_cast<float>(_strike_peak_delta[i] - 5) / effective_max;
                     norm = daisysp::fclamp(norm, 0.0f, 1.0f);
 
-                    _velocity[i] = daisysp::fclamp(sqrtf(norm), 0.03f, 1.0f);
+                    float vel = 0.35f * norm + 0.65f * sqrtf(norm);
+                    _velocity[i] = daisysp::fclamp(vel, 0.03f, 1.0f);
                     _pressure[i] = 0.0f;
 
                     if (_on_touch) _on_touch(i);

@@ -26,17 +26,18 @@ Flash the precompiled [**TouchString.bin** (v2.0.0)](https://github.com/vincentl
   - P11 + P02 - Next scale (cycles through all 7 scales)
   - P11 + P03...P09 - Direct scale select (P03: Amara, P04: Oxalis, P05: Pigmy, P06: Major, P07: Natural Minor, P08: Minor Pentatonic, P09: Major Pentatonic)
   - P11 + P01 - Poly / Mono toggle (LED double-blink = Mono, single blink = Poly)
+- **P10 + P11 (TO + CH)** - Hold both together for ~0.5s to recalibrate touch pad baselines (3 rapid blinks)
 
 ### Knobs (clockwise)
 - S30 **Brightness** | Exciter filter cutoff & string brightness
 - S31 **Pitch** | Global tuning across ±1 octave (center = unison)
 - S32 **Timbre** | String structure / harmonic content
 - S33 **Density** | Arpeggiator pattern density (Hold TO: Pattern Shift)
-- S34 **Notes** | Arp note & pitch randomization (octave jumps & random scale notes, arp only)
-- S35 **String** | Per-note timbre variation (randomizes brightness, structure, and damping per pluck) (Hold TO: Reverb Mix)
+- S34 **Notes** | Arpeggiator pitch randomization (chance of octave jumps & random scale notes)
+- S35 **String** | Per-note acoustic timbre variation (randomizes brightness, structure, damping) | Hold TO: Reverb Mix
 
 ### Faders
-- S36 (left) **Drive** | Master drive & velocity taper (above center: saturated overdrive with volume compensation; below center: scales pluck velocity down for whisper-soft acoustic playing) (Hold TO: External Input Gain)
+- S36 (left) **Drive** | Overdrive & loudness compensation (Hold TO: External Input Gain)
 - S37 (right) **Damp** | String decay sustain time / *bariolage* ring
 
 ### Switches
@@ -80,6 +81,7 @@ The onboard LED provides rich visual feedback:
   - *-1 / -2 Octaves*: 1 or 2 slow pulses
 - **Voice Mode**: Double blink = Mono, single long blink = Poly.
 - **Tap Tempo**: Flashes instantly on valid taps to confirm tempo sync.
+- **Recalibration**: 3 rapid blinks confirm capacitive sensor baseline reset.
 
 ## Project Structure
 ```

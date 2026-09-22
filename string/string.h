@@ -121,21 +121,9 @@ public:
   void SetReverbMix(const float value) { _xfade.SetStage(value); }
 
   void SetDrive(const float value) {
-    float drv = 0.20f + value * 0.35f;
-    float comp = 1.0f - value * 0.55f;
-    _volume = comp * comp;
-    for (auto& d : _drive) {
-      d.SetDrive(drv);
-    }
-    if (value < 0.20f) {
-      float t = value / 0.20f;
-      _drive_vel_scale = 0.50f + 0.50f * t;
-      if (t < 0.05f) {
-        _volume *= (t / 0.05f);
-      }
-    } else {
-      _drive_vel_scale = 1.0f;
-    }
+    _drive.SetDrive(0.2f + value * .3f);
+    _volume = 1.f - value * 0.6f;
+    _volume *= _volume;
   }
 
   void SetInputVolume(const float value) { _input_volume = daisysp::fclamp(value, 0.f, 1.f); }
@@ -166,7 +154,7 @@ private:
   Trigger  _trigger;
   CPattern _pattern;
   Arp<kNotesCount, 4> _arp;
-  std::array<daisysp::Overdrive, kVoicesCount> _drive;
+  daisysp::Overdrive _drive;
   daisysp::ReverbSc  _reverb;
   XFade _xfade;
   Latch<kNotesCount> _latch;
@@ -184,14 +172,13 @@ private:
   float _brightness;
   float _structure;
   float _damping;
+  std::array<float, kVoicesCount> _bright_offset;
+  std::array<float, kVoicesCount> _struct_offset;
+  std::array<float, kVoicesCount> _damp_offset;
   uint8_t _human_note_chance;
   uint8_t _human_string_chance;
   float _volume;
   bool _is_arp_on;
-  float _drive_vel_scale;
-  std::array<float, kVoicesCount> _human_bright_offset;
-  std::array<float, kVoicesCount> _human_struct_offset;
-  std::array<float, kVoicesCount> _human_damp_offset;
   int _exciter_mode;
   float _input_volume;
   float _trans_mult;

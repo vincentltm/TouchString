@@ -26,7 +26,9 @@ public:
     _blink_off_ticks { 0 },
     _blink_is_on { false },
     _beat_pulse_timer { 0 },
-    _last_to_touch_time { 0 }
+    _last_to_touch_time { 0 },
+    _recal_counter { 0 },
+    _recal_latched { false }
      {
          _hold_ticks.fill(0);
      }
@@ -158,6 +160,8 @@ private:
     bool _blink_is_on;
     uint8_t _beat_pulse_timer;
     uint32_t _last_to_touch_time;
+    uint16_t _recal_counter;
+    bool _recal_latched;
 };
 
 };

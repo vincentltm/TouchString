@@ -32,6 +32,7 @@ public:
 
     void Init(daisy::DaisySeed& hw);
     void Process();
+    void Recalibrate();
 
     void SetOnTouch(std::function<void(uint16_t)> on_touch) {
         _on_touch = on_touch;

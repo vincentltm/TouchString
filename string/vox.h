@@ -303,10 +303,12 @@ public:
     _current_freq = freq;
     _aftertouch = 0.f;
     _target_aftertouch = 0.f;
-    _aftertouch_baseline = 0.05f;
-    _aftertouch_lockout = 1500; // ~30ms at 48kHz: strike transient finishes cleanly
+    _aftertouch_baseline = 1.0f;
+    _aftertouch_lockout = 12000; // 250ms at 48kHz: rock-solid stable strike attack
     _accent = daisysp::fclamp(0.04f + 0.90f * velocity, 0.02f, 0.95f);
-    _strike_gain = velocity * (0.05f + 0.95f * velocity);
+    float eff_freq = daisysp::fclamp(freq * _freq_mult, 20.f, 8000.f);
+    float freq_comp = daisysp::fclamp(sqrtf(eff_freq / 261.63f), 0.60f, 1.20f);
+    _strike_gain = velocity * (0.05f + 0.95f * velocity) * freq_comp;
     _update_bright_ratio();
     _update_filter();
     _update_string_params();
@@ -386,18 +388,27 @@ public:
       return 0.f;
     }
 
-    // Guitar-like aftertouch in pluck mode (finger bend vibrato)
+    // Subtle guitar-like aftertouch ONLY in pluck mode (finger rocking vibrato)
     if (!_is_bowing) {
       if (_aftertouch_lockout > 0) {
         _aftertouch_lockout--;
+        if (_aftertouch_lockout == 0) {
+          // Attack phase ended: capture resting touch baseline
+          _aftertouch_baseline = daisysp::fclamp(_target_aftertouch, 0.10f, 0.85f);
+          _aftertouch = 0.0f;
+        }
         _target_freq = _base_freq;
       } else {
-        // Direct, expressive pressure response while holding the pad
-        float target_press = daisysp::fclamp((_target_aftertouch - 0.04f) / 0.65f, 0.0f, 1.0f);
-        _aftertouch += (target_press - _aftertouch) * 0.01f;
+        // Only respond to intentional extra pressure beyond the landing touch
+        float extra = _target_aftertouch - _aftertouch_baseline;
+        float target_press = (extra > 0.06f)
+          ? daisysp::fclamp((extra - 0.06f) / (1.0f - _aftertouch_baseline), 0.0f, 1.0f)
+          : 0.0f;
+        _aftertouch += (target_press - _aftertouch) * 0.003f;
 
-        // Expressive acoustic bend (up to ~85 cents on firm squeeze):
-        float bend = _aftertouch * 0.055f;
+        // Subtle acoustic bend (max +25 cents at full squeeze):
+        // Hand micro-rocking directly generates real acoustic finger vibrato
+        float bend = (_aftertouch * _aftertouch) * 0.015f;
         _target_freq = _base_freq * (1.0f + bend);
       }
     } else {

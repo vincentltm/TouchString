@@ -45,6 +45,19 @@ void StringUI::Process(DaisySeed& hw) {
     _is_to_touched = _touch.pads().IsTouched(10);
     _is_ch_touched = _touch.pads().IsTouched(11);
 
+    // Baseline Recalibration: Touch both modifier pads (P10 & P11) simultaneously for ~0.5s
+    if (_is_to_touched && _is_ch_touched) {
+        _recal_counter++;
+        if (_recal_counter > 120 && !_recal_latched) {
+            _recal_latched = true;
+            _touch.pads().Recalibrate();
+            _trigger_blink_pattern(3, 8, 8); // 3 rapid blinks confirm recalibration
+        }
+    } else {
+        _recal_counter = 0;
+        _recal_latched = false;
+    }
+
     if (_is_first_run) {
         _is_first_run = false;
         auto initial_s36 = _touch.knobs().s36().Process();
@@ -121,14 +134,13 @@ void StringUI::Process(DaisySeed& hw) {
             } else if (_exciter_mode == 1) {
                 // Pluck + Bow on hold (Squeeze-to-swell)
                 _hold_ticks[active]++;
-                if (_hold_ticks[active] > 5 && press > 0.04f) {
-                    float bow_amt = (press - 0.04f) / 0.50f;
+                if (_hold_ticks[active] > 5 && press > 0.08f) {
+                    float bow_amt = (press - 0.08f) / 0.92f;
                     _string.SetVoicePressure(0, daisysp::fclamp(bow_amt * 0.70f, 0.0f, 0.85f));
                     _string.SetVoiceSustain(0, true);
                 } else {
                     _string.SetVoicePressure(0, 0.0f);
                     _string.SetVoiceSustain(0, false);
-                    _string.SetVoiceAftertouch(0, press);
                 }
             } else {
                 _string.SetVoicePressure(0, 0.0f);
@@ -159,9 +171,9 @@ void StringUI::Process(DaisySeed& hw) {
                 if (_touch.pads().IsTouched(p_idx)) {
                     _hold_ticks[i]++;
                     float p = _touch.pads().Pressure(p_idx);
-                    if (_hold_ticks[i] > 5 && p > 0.04f) {
+                    if (_hold_ticks[i] > 5 && p > 0.08f) {
                         // Squeeze-to-swell: blooms into bowed sustain as finger presses down
-                        float bow_amt = (p - 0.04f) / 0.50f;
+                        float bow_amt = (p - 0.08f) / 0.92f;
                         _string.SetVoicePressure(i, daisysp::fclamp(bow_amt * 0.70f, 0.0f, 0.85f));
                         _string.SetVoiceSustain(i, true);
                     } else {
@@ -183,7 +195,6 @@ void StringUI::Process(DaisySeed& hw) {
                 float p = _touch.pads().IsTouched(p_idx) ? _touch.pads().Pressure(p_idx) : 0.0f;
                 _string.SetPadPressure(i, p);
                 _string.SetVoicePressure(i, 0.0f);
-                _string.SetVoiceAftertouch(i, p);
             }
         }
     }
@@ -326,13 +337,8 @@ void StringUI::_on_pad_touch(uint16_t pad) {
         return;
     }
     auto note_num = pad - kFirstNotePad;
-    float vel;
-    if (_exciter_mode == 2) {
-        float p_now = _touch.pads().Pressure(pad);
-        vel = daisysp::fclamp(p_now * 1.5f + 0.20f, 0.20f, 0.85f);
-    } else {
-        vel = _touch.pads().Velocity(pad);
-    }
+    // In Bow mode, continuous pressure directly seeds bowing so feather touches swell smoothly from zero
+    float vel = (_exciter_mode == 2) ? _touch.pads().Pressure(pad) : _touch.pads().Velocity(pad);
     _hold_ticks[note_num] = 0;
     _string.NoteOn(note_num, vel);
 };
