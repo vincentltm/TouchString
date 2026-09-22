@@ -128,7 +128,9 @@ void StringUI::Process(DaisySeed& hw) {
 
             float voice_bow_p = 0.0f;
             if (_exciter_mode == 2) {
-                voice_bow_p = press;
+                if (!is_arp_on) {
+                    voice_bow_p = press;
+                }
             } else if (_exciter_mode == 1) {
                 if (touched) {
                     _hold_ticks[i]++;
@@ -138,15 +140,17 @@ void StringUI::Process(DaisySeed& hw) {
                     }
                 } else {
                     _hold_ticks[i] = 0;
-                    if (_string.IsNoteLatched(i)) {
+                    if (is_arp_on && _string.IsNoteLatched(i)) {
                         voice_bow_p = 0.35f;
                     }
                 }
             }
 
             if (!_string.IsMono()) {
-                _string.SetVoicePressure(i, voice_bow_p);
-                _string.SetVoiceSustain(i, voice_bow_p > 0.001f);
+                if (!is_arp_on || _exciter_mode == 1) {
+                    _string.SetVoicePressure(i, voice_bow_p);
+                    _string.SetVoiceSustain(i, voice_bow_p > 0.001f);
+                }
                 if (_exciter_mode == 0) {
                     _string.SetVoiceAftertouch(i, press);
                 }
@@ -154,15 +158,17 @@ void StringUI::Process(DaisySeed& hw) {
                 if (active_mono == i) {
                     active_mono_press = press;
                     mono_bow_p = voice_bow_p;
-                } else if (active_mono < 0 && _string.IsNoteLatched(i)) {
+                } else if (active_mono < 0 && is_arp_on && _string.IsNoteLatched(i)) {
                     mono_bow_p = voice_bow_p;
                 }
             }
         }
 
         if (_string.IsMono()) {
-            _string.SetVoicePressure(0, mono_bow_p);
-            _string.SetVoiceSustain(0, mono_bow_p > 0.001f);
+            if (!is_arp_on || _exciter_mode == 1) {
+                _string.SetVoicePressure(0, mono_bow_p);
+                _string.SetVoiceSustain(0, mono_bow_p > 0.001f);
+            }
             _string.SetVoiceAftertouch(0, (_exciter_mode == 0 && active_mono >= 0) ? active_mono_press : 0.0f);
         }
     }
