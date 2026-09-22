@@ -43,17 +43,20 @@ Flash the precompiled [**TouchString.bin** (v2.0.0)](https://github.com/vincentl
 ### Switches
 - **Left Switch (S09/S10) — Exciter Mode**
   - **Up**: Pluck (velocity-sensitive, whisper-quiet to snappy)
-  - **Center**: Pluck + Bow on hold (squeeze pad to swell into bowed sustain)
+  - **Center**: Pluck + Bow on hold (squeeze pad to swell into bowed sustain; hold chord in Arp to sustain bowed chord bed while plucking)
   - **Down**: Bow (continuous stick-slip bowing & scratch sensitivity)
 
 - **Right Switch (S07/S08) — Arpeggiator**
-  - **Up**: Latched
-  - **Center**: On (momentary)
+  - **Up**: Latched (loops arpeggio step-by-step hands-free)
+  - **Center**: On (momentary, active while holding pads)
   - **Down**: Off
 
 ### Polyphony & Expression
 - **Poly / Mono Modes**: Toggle with P11 + P01. In Poly mode, all 7 strings run in stereo. In Mono mode, notes have last-note priority with centered stereo panning and smooth portamento.
-- **Bowed Arpeggiator**: In Bow mode, Mono plays a seamless, singing slurred legato line across notes. In Poly mode, strings ring out together in harmonic *bariolage*.
+- **Pluck + Bow Arpeggiator**: In Mode 1 (Left Switch center), holding down a chord with your fingers sustains a rich, singing bowed chord cushion while the arpeggiator simultaneously plucks through each note with crisp attack! When fingers release or in Latched Arp mode, notes play cleanly step-by-step.
+- **Bowed Arpeggiator**: In Bow mode (Left Switch down), the arpeggiator steps purely through notes in sequence (stereo *bariolage* in Poly mode with resonant acoustic ring-out, and seamless slurred legato portamento in Mono mode).
+- **S36 Dynamic Fader**: In the bottom 30% ($0.0$ to $0.30$), scales down strike velocity and physical string damping for felted, whisper-quiet acoustic decays and fades smoothly to silence. In the upper 70% ($0.30$ to $1.00$), swells into smooth, symmetric analog overdrive with automatic loudness compensation.
+- **Zero-DC Helmholtz Bow Physics**: Closed-loop stick-slip friction with zero-DC equilibrium subtraction and dual-stage DC blockers for clean, symmetric overdrive without background flutter or motorboating.
 - **Keyboard Octaves & Bass Drones**: Tapping P00 or P02 shifts the keyboard for new notes without interrupting currently held notes. You can hold a low bass drone with one hand, shift octaves, and pluck high melodies over it.
 - **String Dampen (P01)**: Squeeze P01 for acoustic palm-muting across all strings, or tap it to silence resonance.
 - **Velocity Sensitivity**: Responsive kinetic tracking from whisper-quiet soft plucks to bright, punchy fortissimo.
