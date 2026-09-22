@@ -254,6 +254,7 @@ public:
     _string.Init(sample_rate);
     _filter.Init(sample_rate);
     _filter.SetRes(0.0f);
+    _dc_block.Init(sample_rate);
     _target_freq = initial_freq;
     _current_freq = initial_freq;
     _base_freq = initial_freq;
@@ -367,6 +368,7 @@ public:
     _string.Reset();
     _filter.Init(_sample_rate);
     _filter.SetRes(0.0f);
+    _dc_block.Init(_sample_rate);
     _is_active = false;
     _is_bowing = false;
     _bow_pressure = 0.f;
@@ -449,10 +451,11 @@ public:
     }
 
     if (_bow_env > 0.0001f) {
-      // Closed-loop non-linear stick-slip Helmholtz friction
+      // Closed-loop non-linear stick-slip Helmholtz friction with zero-DC equilibrium
       float v_rel = _bow_env - 0.60f * _last_string_out;
       float friction = v_rel / (1.0f + 4.5f * (v_rel * v_rel));
-      float bow_force = friction * (_bow_env * 0.28f * _freq_scale);
+      float static_f = _bow_env / (1.0f + 4.5f * (_bow_env * _bow_env));
+      float bow_force = (friction - static_f) * (_bow_env * 0.28f * _freq_scale);
 
       // Acoustic rosin friction noise is purely continuous, musical, and proportional to bow force
       float rosin = noise * (_bow_env * 0.045f * (0.30f + fabsf(v_rel)) * _freq_scale);
@@ -467,6 +470,7 @@ public:
     float in = _filter.Low();
 
     float out = _string.Process(in);
+    out = _dc_block.Process(out);
     _last_string_out = daisysp::fclamp(out, -1.2f, 1.2f);
 
     // Voice activity detection
@@ -558,8 +562,9 @@ private:
 
   float    _last_string_out;
 
-  daisysp::Svf _filter;
-  FastString   _string;
+  daisysp::Svf     _filter;
+  FastString       _string;
+  daisysp::DcBlock _dc_block;
 };
 
 };

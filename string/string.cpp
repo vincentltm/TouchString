@@ -84,6 +84,9 @@ void String::Init(const float sample_rate, const float buffer_size) {
   _body_filter_r.SetFreq(310.0f);
   _body_filter_r.SetRes(0.40f);
 
+  _dc_block_l.Init(sample_rate);
+  _dc_block_r.Init(sample_rate);
+
   _reverb.Init(sample_rate);
   _reverb.SetFeedback(kReverbFeedback);
   _reverb.SetLpFreq(kReverLPFreq);
@@ -388,6 +391,9 @@ void String::Process(const float * const *in, float **out, size_t size) {
     _body_filter_r.Process(sum_r);
     sum_l = sum_l * 0.76f + _body_filter_l.Band() * 0.24f;
     sum_r = sum_r * 0.76f + _body_filter_r.Band() * 0.24f;
+
+    sum_l = _dc_block_l.Process(sum_l);
+    sum_r = _dc_block_r.Process(sum_r);
 
     _bus[0] = _drive.Process(sum_l) * _volume;
     _bus[1] = _drive.Process(sum_r) * _volume;

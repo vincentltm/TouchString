@@ -205,6 +205,8 @@ private:
   float _dampen_pressure;
   daisysp::Svf _body_filter_l;
   daisysp::Svf _body_filter_r;
+  daisysp::DcBlock _dc_block_l;
+  daisysp::DcBlock _dc_block_r;
   uint8_t _clock_tick_counter;
   bool _beat_pulse;
 
