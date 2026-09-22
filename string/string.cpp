@@ -451,7 +451,9 @@ void String::_on_arp_note_on(uint8_t num, uint8_t vel) {
     float pluck_vel = (p > 0.05f) ? daisysp::fclamp(sqrtf(p), 0.25f, 1.0f) : 0.85f;
     pluck_vel *= (0.15f + 0.85f * _soft_scale);
     _vox[voice_idx].NoteOn(freq, pluck_vel);
-    _vox[voice_idx].SetBowPressure(pluck_vel * 0.40f);
+    float bow_p = (p > 0.08f) ? daisysp::fclamp(((p - 0.08f) / 0.92f) * 0.50f, 0.20f, 0.70f) : 0.35f;
+    bow_p *= (0.25f + 0.75f * _soft_scale);
+    _vox[voice_idx].SetBowPressure(bow_p);
     _vox[voice_idx].SetSustain(true);
   } else {
     // Pure Pluck mode: crisp pluck strike, zero bow pressure
@@ -465,14 +467,18 @@ void String::_on_arp_note_on(uint8_t num, uint8_t vel) {
 
 void String::_on_arp_note_off(uint8_t num) {
   if (_is_mono) {
-    if (_exciter_mode == 2) {
-      // In Bow mode Mono: sustain bow across steps for continuous slurred portamento!
+    if (_exciter_mode == 2 || (_exciter_mode == 1 && (_pad_pressure[num] > 0.08f || IsNoteLatched(num)))) {
+      // In Bow mode or sustained Pluck+Bow: sustain bow across steps!
       return;
     }
     _vox[0].SetBowPressure(0.0f);
     _vox[0].SetSustain(false);
   } else {
     if (num < kVoicesCount) {
+      if (_exciter_mode == 1 && (_pad_pressure[num] > 0.08f || IsNoteLatched(num))) {
+        // Sustained chord pad: do not kill bow sustain on note-off!
+        return;
+      }
       _vox[num].SetBowPressure(0.0f);
       _vox[num].SetSustain(false);
     }

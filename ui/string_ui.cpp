@@ -116,88 +116,55 @@ void StringUI::Process(DaisySeed& hw) {
 
     // Continuous pressure handling for bowing / hold ...........
     if (!ch_touched) {
-        if (is_arp_on) {
-            for (uint8_t i = 0; i < 7; i++) {
-                uint16_t p_idx = i + kFirstNotePad;
-                _string.SetPadPressure(i, _touch.pads().IsTouched(p_idx) ? _touch.pads().Pressure(p_idx) : 0.0f);
-            }
-        } else if (_string.IsMono()) {
-        int8_t active = _string.ActiveMonoPad();
-        if (active >= 0) {
-            uint16_t p_idx = active + kFirstNotePad;
-            float press = _touch.pads().IsTouched(p_idx) ? _touch.pads().Pressure(p_idx) : 0.0f;
-            _string.SetPadPressure(active, press);
+        int8_t active_mono = _string.IsMono() ? _string.ActiveMonoPad() : -1;
+        float mono_bow_p = 0.0f;
+        float active_mono_press = 0.0f;
 
+        for (uint8_t i = 0; i < 7; i++) {
+            uint16_t p_idx = i + kFirstNotePad;
+            bool touched = _touch.pads().IsTouched(p_idx);
+            float press = touched ? _touch.pads().Pressure(p_idx) : 0.0f;
+            _string.SetPadPressure(i, press);
+
+            float voice_bow_p = 0.0f;
             if (_exciter_mode == 2) {
-                // Bow mode: hand pressure directly modulates bowing on single centered voice
-                _string.SetVoicePressure(0, press);
+                voice_bow_p = press;
             } else if (_exciter_mode == 1) {
-                // Pluck + Bow on hold (Squeeze-to-swell)
-                _hold_ticks[active]++;
-                if (_hold_ticks[active] > 5 && press > 0.08f) {
-                    float bow_amt = (press - 0.08f) / 0.92f;
-                    _string.SetVoicePressure(0, daisysp::fclamp(bow_amt * 0.70f, 0.0f, 0.85f));
-                    _string.SetVoiceSustain(0, true);
-                } else {
-                    _string.SetVoicePressure(0, 0.0f);
-                    _string.SetVoiceSustain(0, false);
-                }
-            } else {
-                _string.SetVoicePressure(0, 0.0f);
-                _string.SetVoiceSustain(0, false);
-                _string.SetVoiceAftertouch(0, press);
-            }
-        } else {
-            _string.SetVoicePressure(0, 0.0f);
-            _string.SetVoiceSustain(0, false);
-            _string.SetVoiceAftertouch(0, 0.0f);
-            for (uint8_t i = 0; i < 7; i++) {
-                _hold_ticks[i] = 0;
-            }
-        }
-    } else {
-        if (_exciter_mode == 2) {
-            for (uint8_t i = 0; i < 7; i++) {
-                uint16_t p_idx = i + kFirstNotePad;
-                if (_touch.pads().IsTouched(p_idx)) {
-                    _string.SetVoicePressure(i, _touch.pads().Pressure(p_idx));
-                } else {
-                    _string.SetVoicePressure(i, 0.0f);
-                }
-            }
-        } else if (_exciter_mode == 1) {
-            for (uint8_t i = 0; i < 7; i++) {
-                uint16_t p_idx = i + kFirstNotePad;
-                if (_touch.pads().IsTouched(p_idx)) {
+                if (touched) {
                     _hold_ticks[i]++;
-                    float p = _touch.pads().Pressure(p_idx);
-                    if (_hold_ticks[i] > 5 && p > 0.08f) {
-                        // Squeeze-to-swell: blooms into bowed sustain as finger presses down
-                        float bow_amt = (p - 0.08f) / 0.92f;
-                        _string.SetVoicePressure(i, daisysp::fclamp(bow_amt * 0.70f, 0.0f, 0.85f));
-                        _string.SetVoiceSustain(i, true);
-                    } else {
-                        _string.SetVoicePressure(i, 0.0f);
-                        _string.SetVoiceSustain(i, false);
-                        _string.SetPadPressure(i, p);
+                    if (_hold_ticks[i] > 5 && press > 0.08f) {
+                        float bow_amt = (press - 0.08f) / 0.92f;
+                        voice_bow_p = daisysp::fclamp(bow_amt * 0.70f, 0.0f, 0.85f);
                     }
                 } else {
                     _hold_ticks[i] = 0;
-                    _string.SetVoiceSustain(i, false);
-                    _string.SetVoicePressure(i, 0.0f);
-                    _string.SetPadPressure(i, 0.0f);
+                    if (_string.IsNoteLatched(i)) {
+                        voice_bow_p = 0.35f;
+                    }
                 }
             }
-        } else {
-            _string.SetSustain(false);
-            for (uint8_t i = 0; i < 7; i++) {
-                uint16_t p_idx = i + kFirstNotePad;
-                float p = _touch.pads().IsTouched(p_idx) ? _touch.pads().Pressure(p_idx) : 0.0f;
-                _string.SetPadPressure(i, p);
-                _string.SetVoicePressure(i, 0.0f);
+
+            if (!_string.IsMono()) {
+                _string.SetVoicePressure(i, voice_bow_p);
+                _string.SetVoiceSustain(i, voice_bow_p > 0.001f);
+                if (_exciter_mode == 0) {
+                    _string.SetVoiceAftertouch(i, press);
+                }
+            } else {
+                if (active_mono == i) {
+                    active_mono_press = press;
+                    mono_bow_p = voice_bow_p;
+                } else if (active_mono < 0 && _string.IsNoteLatched(i)) {
+                    mono_bow_p = voice_bow_p;
+                }
             }
         }
-    }
+
+        if (_string.IsMono()) {
+            _string.SetVoicePressure(0, mono_bow_p);
+            _string.SetVoiceSustain(0, mono_bow_p > 0.001f);
+            _string.SetVoiceAftertouch(0, (_exciter_mode == 0 && active_mono >= 0) ? active_mono_press : 0.0f);
+        }
     }
 
     // Pitch (real-time) ..........................................

@@ -97,6 +97,10 @@ public:
     }
   }
 
+  bool IsNoteLatched(const uint8_t num) const {
+    return _is_arp_on && _latch.on() && _latch.is_held(num);
+  }
+
   void Reset();
 
   uint8_t ScalesCount() { return _scale.ScalesCount(); }
