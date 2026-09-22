@@ -126,12 +126,15 @@ public:
       _drive.SetDrive(0.2f);
       float atten = value / kBreak;
       _volume = atten * atten;
+      _soft_scale = atten;
     } else {
+      _soft_scale = 1.0f;
       float u = (value - kBreak) / (1.0f - kBreak);
       _drive.SetDrive(0.2f + u * 0.3f);
       float comp = 1.0f - u * 0.55f;
       _volume = comp * comp;
     }
+    _update_damping();
   }
 
   void SetInputVolume(const float value) { _input_volume = daisysp::fclamp(value, 0.f, 1.f); }
@@ -152,6 +155,7 @@ private:
 
   float _humanized_note_freq(uint8_t note);
   void _humanize_and_apply(uint8_t voice_num);
+  void _update_damping();
 
   static constexpr uint8_t kPPQN = 48;
   static constexpr uint8_t kPPQNExtern = 24;
@@ -186,6 +190,7 @@ private:
   uint8_t _human_note_chance;
   uint8_t _human_string_chance;
   float _volume;
+  float _soft_scale;
   bool _is_arp_on;
   int _exciter_mode;
   float _input_volume;
