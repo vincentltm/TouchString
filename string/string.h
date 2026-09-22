@@ -121,12 +121,15 @@ public:
   void SetReverbMix(const float value) { _xfade.SetStage(value); }
 
   void SetDrive(const float value) {
-    _drive.SetDrive(0.20f + value * 0.40f);
-    float comp = 1.0f - value * 0.50f;
+    float drv = 0.20f + value * 0.35f;
+    float comp = 1.0f - value * 0.55f;
     _volume = comp * comp;
+    for (auto& d : _drive) {
+      d.SetDrive(drv);
+    }
     if (value < 0.20f) {
       float t = value / 0.20f;
-      _drive_vel_scale = 0.40f + 0.60f * t;
+      _drive_vel_scale = 0.50f + 0.50f * t;
       if (t < 0.05f) {
         _volume *= (t / 0.05f);
       }
@@ -163,7 +166,7 @@ private:
   Trigger  _trigger;
   CPattern _pattern;
   Arp<kNotesCount, 4> _arp;
-  daisysp::Overdrive _drive;
+  std::array<daisysp::Overdrive, kVoicesCount> _drive;
   daisysp::ReverbSc  _reverb;
   XFade _xfade;
   Latch<kNotesCount> _latch;

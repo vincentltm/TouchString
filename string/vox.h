@@ -304,9 +304,9 @@ public:
     _aftertouch = 0.f;
     _target_aftertouch = 0.f;
     _aftertouch_baseline = 0.05f;
-    _aftertouch_lockout = 1200; // ~25ms at 48kHz: strike transient finishes cleanly
-    _accent = daisysp::fclamp(0.15f + 0.85f * velocity, 0.05f, 1.0f);
-    _strike_gain = 0.35f + 0.85f * (velocity * velocity);
+    _aftertouch_lockout = 1500; // ~30ms at 48kHz: strike transient finishes cleanly
+    _accent = daisysp::fclamp(0.04f + 0.90f * velocity, 0.02f, 0.95f);
+    _strike_gain = velocity * (0.05f + 0.95f * velocity);
     _update_bright_ratio();
     _update_filter();
     _update_string_params();
@@ -386,27 +386,19 @@ public:
       return 0.f;
     }
 
-    // Guitar-like aftertouch in pluck mode (finger bend vibrato, bloom & sustain)
+    // Guitar-like aftertouch in pluck mode (finger bend vibrato)
     if (!_is_bowing) {
       if (_aftertouch_lockout > 0) {
         _aftertouch_lockout--;
         _target_freq = _base_freq;
       } else {
         // Direct, expressive pressure response while holding the pad
-        float target_press = daisysp::fclamp((_target_aftertouch - 0.04f) / 0.75f, 0.0f, 1.0f);
-        _aftertouch += (target_press - _aftertouch) * 0.008f;
+        float target_press = daisysp::fclamp((_target_aftertouch - 0.04f) / 0.65f, 0.0f, 1.0f);
+        _aftertouch += (target_press - _aftertouch) * 0.01f;
 
-        // Expressive acoustic bend (up to +1 semitone / 100 cents on firm squeeze):
-        float bend = _aftertouch * 0.065f;
+        // Expressive acoustic bend (up to ~85 cents on firm squeeze):
+        float bend = _aftertouch * 0.055f;
         _target_freq = _base_freq * (1.0f + bend);
-
-        // Bloom & sustain extension when held:
-        if (_aftertouch > 0.02f) {
-          float hold_sustain = _damping + _aftertouch * 0.30f * (1.0f - _damping);
-          float hold_bright = _brightness + _aftertouch * 0.25f * (1.0f - _brightness);
-          _string.SetDamping(daisysp::fclamp(hold_sustain, 0.0f, 0.98f));
-          _string.SetBrightness(daisysp::fclamp(hold_bright, 0.0f, 0.98f));
-        }
       }
     } else {
       // Bow mode: subtle physical pitch deflection under heavy bow force (~2-4 cents flattening)

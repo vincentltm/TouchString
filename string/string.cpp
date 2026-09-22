@@ -75,7 +75,9 @@ void String::Init(const float sample_rate, const float buffer_size) {
     _vox[i].Init(sample_rate, _scale.FreqAt(i), 123456789u + static_cast<uint32_t>(i) * 987654321u);
   }
 
-  _drive.Init();
+  for (auto& d : _drive) {
+    d.Init();
+  }
 
   _body_filter_l.Init(sample_rate);
   _body_filter_r.Init(sample_rate);
@@ -374,16 +376,18 @@ void String::Process(const float * const *in, float **out, size_t size) {
     float sum_r = 0.f;
     if (_is_mono) {
       float s = _vox[0].Process(ext_audio * 0.40f);
-      sum_l = s * 0.7071f;
-      sum_r = s * 0.7071f;
+      float driven = _drive[0].Process(s);
+      sum_l = driven * 0.7071f;
+      sum_r = driven * 0.7071f;
     } else {
       for (size_t v = 0; v < kVoicesCount; v++) {
         float s = _vox[v].Process(ext_audio * 0.40f);
-        sum_l += s * kPanL[v];
-        sum_r += s * kPanR[v];
+        float driven = _drive[v].Process(s);
+        sum_l += driven * kPanL[v];
+        sum_r += driven * kPanR[v];
       }
-      sum_l *= 0.65f;
-      sum_r *= 0.65f;
+      sum_l *= 0.85f;
+      sum_r *= 0.85f;
     }
 
     // Acoustic wooden body soundboard formant resonance (~310 Hz)
@@ -392,11 +396,8 @@ void String::Process(const float * const *in, float **out, size_t size) {
     sum_l = sum_l * 0.76f + _body_filter_l.Band() * 0.24f;
     sum_r = sum_r * 0.76f + _body_filter_r.Band() * 0.24f;
 
-    float drive_in_l = sum_l * 2.2f;
-    float drive_in_r = sum_r * 2.2f;
-
-    _bus[0] = _drive.Process(drive_in_l) * _volume;
-    _bus[1] = _drive.Process(drive_in_r) * _volume;
+    _bus[0] = sum_l * _volume;
+    _bus[1] = sum_r * _volume;
     _xfade.Process(0, 0, _bus[0], _bus[1], _reverb_in[0], _reverb_in[1]);
     _reverb.Process(_reverb_in[0], _reverb_in[1], &(_reverb_out[0]), &(_reverb_out[1]));
     out[0][i] = daisysp::SoftLimit(_bus[0] + _reverb_out[0]);
@@ -512,17 +513,18 @@ float String::_humanized_note_freq(uint8_t note) {
 
 void String::_humanize_and_apply(uint8_t voice_num) {
   if (voice_num >= kVoicesCount) return;
-  if (_human_string_chance > 2) {
+  if (_human_string_chance > 2 && _exciter_mode != 2) {
     auto chance_dice = _dice(_rand_engine);
     if (chance_dice < _human_string_chance) {
-      // Bipolar randomization: -0.15 to +0.15 for brightness and structure, -0.20 to +0.20 for damping
+      // Subtle, organic acoustic variations:
+      // +/- 0.03 for brightness and structure, +/- 0.02 for damping
       int16_t bright_rnd = static_cast<int16_t>(_dice(_rand_engine)) - 50;
       int16_t struct_rnd = static_cast<int16_t>(_dice(_rand_engine)) - 50;
       int16_t damp_rnd   = static_cast<int16_t>(_dice(_rand_engine)) - 50;
 
-      _human_bright_offset[voice_num] = static_cast<float>(bright_rnd) * 0.003f;
-      _human_struct_offset[voice_num] = static_cast<float>(struct_rnd) * 0.003f;
-      _human_damp_offset[voice_num]   = static_cast<float>(damp_rnd)   * 0.004f;
+      _human_bright_offset[voice_num] = static_cast<float>(bright_rnd) * 0.0006f; // +/- 0.030
+      _human_struct_offset[voice_num] = static_cast<float>(struct_rnd) * 0.0006f; // +/- 0.030
+      _human_damp_offset[voice_num]   = static_cast<float>(damp_rnd)   * 0.0004f; // +/- 0.020
     } else {
       _human_bright_offset[voice_num] = 0.0f;
       _human_struct_offset[voice_num] = 0.0f;
