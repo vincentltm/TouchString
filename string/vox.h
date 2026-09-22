@@ -303,10 +303,10 @@ public:
     _current_freq = freq;
     _aftertouch = 0.f;
     _target_aftertouch = 0.f;
-    _aftertouch_baseline = 1.0f;
-    _aftertouch_lockout = 12000; // 250ms at 48kHz: rock-solid stable strike attack
-    _accent = daisysp::fclamp(0.04f + 0.90f * velocity, 0.02f, 0.95f);
-    _strike_gain = velocity * (0.05f + 0.95f * velocity);
+    _aftertouch_baseline = 0.05f;
+    _aftertouch_lockout = 1200; // ~25ms at 48kHz: strike transient finishes cleanly
+    _accent = daisysp::fclamp(0.15f + 0.85f * velocity, 0.05f, 1.0f);
+    _strike_gain = 0.35f + 0.85f * (velocity * velocity);
     _update_bright_ratio();
     _update_filter();
     _update_string_params();
@@ -386,28 +386,27 @@ public:
       return 0.f;
     }
 
-    // Subtle guitar-like aftertouch ONLY in pluck mode (finger rocking vibrato)
+    // Guitar-like aftertouch in pluck mode (finger bend vibrato, bloom & sustain)
     if (!_is_bowing) {
       if (_aftertouch_lockout > 0) {
         _aftertouch_lockout--;
-        if (_aftertouch_lockout == 0) {
-          // Attack phase ended: capture resting touch baseline
-          _aftertouch_baseline = daisysp::fclamp(_target_aftertouch, 0.10f, 0.85f);
-          _aftertouch = 0.0f;
-        }
         _target_freq = _base_freq;
       } else {
-        // Only respond to intentional extra pressure beyond the landing touch
-        float extra = _target_aftertouch - _aftertouch_baseline;
-        float target_press = (extra > 0.06f)
-          ? daisysp::fclamp((extra - 0.06f) / (1.0f - _aftertouch_baseline), 0.0f, 1.0f)
-          : 0.0f;
-        _aftertouch += (target_press - _aftertouch) * 0.003f;
+        // Direct, expressive pressure response while holding the pad
+        float target_press = daisysp::fclamp((_target_aftertouch - 0.04f) / 0.75f, 0.0f, 1.0f);
+        _aftertouch += (target_press - _aftertouch) * 0.008f;
 
-        // Subtle acoustic bend (max +25 cents at full squeeze):
-        // Hand micro-rocking directly generates real acoustic finger vibrato
-        float bend = (_aftertouch * _aftertouch) * 0.015f;
+        // Expressive acoustic bend (up to +1 semitone / 100 cents on firm squeeze):
+        float bend = _aftertouch * 0.065f;
         _target_freq = _base_freq * (1.0f + bend);
+
+        // Bloom & sustain extension when held:
+        if (_aftertouch > 0.02f) {
+          float hold_sustain = _damping + _aftertouch * 0.30f * (1.0f - _damping);
+          float hold_bright = _brightness + _aftertouch * 0.25f * (1.0f - _brightness);
+          _string.SetDamping(daisysp::fclamp(hold_sustain, 0.0f, 0.98f));
+          _string.SetBrightness(daisysp::fclamp(hold_bright, 0.0f, 0.98f));
+        }
       }
     } else {
       // Bow mode: subtle physical pitch deflection under heavy bow force (~2-4 cents flattening)

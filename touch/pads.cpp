@@ -148,13 +148,13 @@ void Pads::Process() {
                 if (_strike_window[i] == 0 || peak_passed) {
                     _strike_window[i] = 0;
 
-                    float effective_max = _pad_max_delta[i] - 5.0f;
+                    float effective_max = (_pad_max_delta[i] - 5.0f) * 0.50f;
                     if (effective_max < 30.0f) effective_max = 30.0f;
 
                     float norm = static_cast<float>(_strike_peak_delta[i] - 5) / effective_max;
                     norm = daisysp::fclamp(norm, 0.0f, 1.0f);
 
-                    _velocity[i] = daisysp::fclamp(sqrtf(norm), 0.03f, 1.0f);
+                    _velocity[i] = daisysp::fclamp(sqrtf(norm), 0.05f, 1.0f);
                     _pressure[i] = target_p;
 
                     if (_on_touch) _on_touch(i);
@@ -166,13 +166,13 @@ void Pads::Process() {
             if (_strike_window[i] > 0) {
                 _strike_window[i] = 0;
                 if (_strike_peak_delta[i] >= 6 && _release_lockout[i] == 0) {
-                    float effective_max = _pad_max_delta[i] - 5.0f;
+                    float effective_max = (_pad_max_delta[i] - 5.0f) * 0.50f;
                     if (effective_max < 30.0f) effective_max = 30.0f;
 
                     float norm = static_cast<float>(_strike_peak_delta[i] - 5) / effective_max;
                     norm = daisysp::fclamp(norm, 0.0f, 1.0f);
 
-                    _velocity[i] = daisysp::fclamp(sqrtf(norm), 0.03f, 1.0f);
+                    _velocity[i] = daisysp::fclamp(sqrtf(norm), 0.05f, 1.0f);
                     _pressure[i] = 0.0f;
 
                     if (_on_touch) _on_touch(i);

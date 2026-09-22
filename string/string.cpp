@@ -392,8 +392,11 @@ void String::Process(const float * const *in, float **out, size_t size) {
     sum_l = sum_l * 0.76f + _body_filter_l.Band() * 0.24f;
     sum_r = sum_r * 0.76f + _body_filter_r.Band() * 0.24f;
 
-    _bus[0] = _drive.Process(sum_l) * _volume;
-    _bus[1] = _drive.Process(sum_r) * _volume;
+    float drive_in_l = sum_l * 2.2f;
+    float drive_in_r = sum_r * 2.2f;
+
+    _bus[0] = _drive.Process(drive_in_l) * _volume;
+    _bus[1] = _drive.Process(drive_in_r) * _volume;
     _xfade.Process(0, 0, _bus[0], _bus[1], _reverb_in[0], _reverb_in[1]);
     _reverb.Process(_reverb_in[0], _reverb_in[1], &(_reverb_out[0]), &(_reverb_out[1]));
     out[0][i] = daisysp::SoftLimit(_bus[0] + _reverb_out[0]);
