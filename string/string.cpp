@@ -467,16 +467,16 @@ void String::_on_arp_note_on(uint8_t num, uint8_t vel) {
 
 void String::_on_arp_note_off(uint8_t num) {
   if (_is_mono) {
-    if (_exciter_mode == 2 || (_exciter_mode == 1 && (_pad_pressure[num] > 0.08f || IsNoteLatched(num)))) {
-      // In Bow mode or sustained Pluck+Bow: sustain bow across steps!
+    if (_exciter_mode == 2 || (_exciter_mode == 1 && _pad_pressure[num] > 0.08f)) {
+      // In Bow mode or sustained Pluck+Bow when physically holding pad: sustain bow across steps!
       return;
     }
     _vox[0].SetBowPressure(0.0f);
     _vox[0].SetSustain(false);
   } else {
     if (num < kVoicesCount) {
-      if (_exciter_mode == 1 && (_pad_pressure[num] > 0.08f || IsNoteLatched(num))) {
-        // Sustained chord pad: do not kill bow sustain on note-off!
+      if (_exciter_mode == 1 && _pad_pressure[num] > 0.08f) {
+        // Voice is physically held down by finger: do not kill bow sustain on note-off!
         return;
       }
       _vox[num].SetBowPressure(0.0f);

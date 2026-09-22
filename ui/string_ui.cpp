@@ -140,9 +140,6 @@ void StringUI::Process(DaisySeed& hw) {
                     }
                 } else {
                     _hold_ticks[i] = 0;
-                    if (is_arp_on && _string.IsNoteLatched(i)) {
-                        voice_bow_p = 0.35f;
-                    }
                 }
             }
 
@@ -157,8 +154,6 @@ void StringUI::Process(DaisySeed& hw) {
             } else {
                 if (active_mono == i) {
                     active_mono_press = press;
-                    mono_bow_p = voice_bow_p;
-                } else if (active_mono < 0 && is_arp_on && _string.IsNoteLatched(i)) {
                     mono_bow_p = voice_bow_p;
                 }
             }
