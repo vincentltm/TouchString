@@ -121,9 +121,17 @@ public:
   void SetReverbMix(const float value) { _xfade.SetStage(value); }
 
   void SetDrive(const float value) {
-    _drive.SetDrive(0.2f + value * .3f);
-    _volume = 1.f - value * 0.6f;
-    _volume *= _volume;
+    const float kBreak = 0.30f;
+    if (value <= kBreak) {
+      _drive.SetDrive(0.2f);
+      float atten = value / kBreak;
+      _volume = atten * atten;
+    } else {
+      float u = (value - kBreak) / (1.0f - kBreak);
+      _drive.SetDrive(0.2f + u * 0.3f);
+      float comp = 1.0f - u * 0.55f;
+      _volume = comp * comp;
+    }
   }
 
   void SetInputVolume(const float value) { _input_volume = daisysp::fclamp(value, 0.f, 1.f); }
