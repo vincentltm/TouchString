@@ -32,11 +32,11 @@ Flash the precompiled [**TouchString.bin** (v2.0.0)](https://github.com/vincentl
 - S31 **Pitch** | Global tuning across ±1 octave (center = unison)
 - S32 **Timbre** | String structure / harmonic content
 - S33 **Density** | Arpeggiator pattern density (Hold TO: Pattern Shift)
-- S34 **Notes** | Arpeggiator note humanization
-- S35 **String Chance** | Trigger probability (Hold TO: Reverb Mix)
+- S34 **Notes** | Arp note & pitch randomization (octave jumps & random scale notes, arp only)
+- S35 **String** | Per-note timbre variation (randomizes brightness, structure, and damping per pluck) (Hold TO: Reverb Mix)
 
 ### Faders
-- S36 (left) **Drive** | Master volume & overdrive (Hold TO: External Input Gain)
+- S36 (left) **Drive** | Master drive & velocity taper (above center: saturated overdrive with volume compensation; below center: scales pluck velocity down for whisper-soft acoustic playing) (Hold TO: External Input Gain)
 - S37 (right) **Damp** | String decay sustain time / *bariolage* ring
 
 ### Switches

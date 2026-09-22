@@ -34,46 +34,47 @@ void Pads::Init(DaisySeed& hw) {
     WriteRegister(0x5E, 0x00);
 
     // Touch and Release thresholds for all 12 electrodes
+    // Touch threshold = 10 counts: sensitive soft-touch response
+    // Release threshold = 6 counts: clean hysteresis, zero chatter, zero stuck pads
     for (uint8_t i = 0; i < 12; i++) {
-        WriteRegister(0x41 + i * 2, 6); // ELEx Touch threshold
-        WriteRegister(0x42 + i * 2, 3); // ELEx Release threshold
+        WriteRegister(0x41 + i * 2, 10); // ELEx Touch threshold
+        WriteRegister(0x42 + i * 2, 6);  // ELEx Release threshold
     }
 
-    // Debounce configuration
-    WriteRegister(0x2B, 0x01); // Debounce Touch: 1 sample
-    WriteRegister(0x2C, 0x02); // Debounce Release: 2 samples
+    // Filter configuration (Rising / Release): official NXP AN3891 & libDaisy
+    WriteRegister(0x2B, 0x01); // MHDR: Max Half Delta Rising
+    WriteRegister(0x2C, 0x01); // NHDR: Noise Half Delta Rising
+    WriteRegister(0x2D, 0x14); // NCLR: Noise Count Limit Rising
+    WriteRegister(0x2E, 0x80); // FDLR: Filter Delay Limit Rising
 
-    // Filter configuration (Rising / Touch)
-    WriteRegister(0x2D, 0x0E); // MHD_R: Max Half Delta Rising
-    WriteRegister(0x2E, 0x00); // NHD_R: Noise Half Delta Rising
-    WriteRegister(0x2F, 0x01); // NCL_R: Noise Count Limit Rising
-    WriteRegister(0x30, 0x01); // FDL_R: Filter Delay Limit Rising
+    // Filter configuration (Falling / Touch): official NXP AN3891 & libDaisy
+    WriteRegister(0x2F, 0x01); // MHDF: Max Half Delta Falling
+    WriteRegister(0x30, 0x05); // NHDF: Noise Half Delta Falling
+    WriteRegister(0x31, 0x01); // NCLF: Noise Count Limit Falling
+    WriteRegister(0x32, 0x80); // FDLF: Filter Delay Limit Falling
 
-    // Filter configuration (Falling / Release)
-    WriteRegister(0x31, 0x10); // MHD_F: Max Half Delta Falling
-    WriteRegister(0x32, 0x04); // NHD_F: Noise Half Delta Falling
-    WriteRegister(0x33, 0x00); // NCL_F: Noise Count Limit Falling
-    WriteRegister(0x34, 0x00); // FDL_F: Filter Delay Limit Falling
+    // Touched filter configuration: baseline frozen during touch
+    WriteRegister(0x33, 0x00); // NHD_T
+    WriteRegister(0x34, 0x00); // NCL_T
+    WriteRegister(0x35, 0x00); // FDL_T
 
-    // Touched filter configuration
-    WriteRegister(0x35, 0x00); // NHD_T
+    // Debounce configuration: register 0x5B
+    // bits [6:4] = Release debounce (2 samples = 0b010), bits [2:0] = Touch debounce (1 sample = 0b001)
+    WriteRegister(0x5B, 0x21);
 
     // Electrode charge current & charge time configuration
-    WriteRegister(0x5B, 0x11); // CDC: Charge Discharge Current (16 uA)
-    WriteRegister(0x5C, 0x50); // CDT: Charge Discharge Time (1 us)
-    WriteRegister(0x5D, 0x41); // Filter / Global CDT
+    WriteRegister(0x5C, 0x10); // CONFIG1: 16 uA charge current
+    WriteRegister(0x5D, 0x20); // CONFIG2: 0.5 us encoding, 1 ms sample period
 
-    // Auto-configuration registers
-    WriteRegister(0x7D, 200);  // USL: Upper search limit
-    WriteRegister(0x7E, 130);  // LSL: Lower search limit
-    WriteRegister(0x7F, 180);  // TL: Target level
-
-    WriteRegister(0x7B, 0x4B); // Auto-configuration control 0
-    WriteRegister(0x7C, 0x00); // Auto-configuration control 1
-
-    // Run mode: 12 electrodes enabled, baseline tracking active
+    // Run mode step 1: 12 electrodes enabled, initialize baseline from resting state
+    // 0x8C: CL = 10 (init baseline from first samples), 12 electrodes
     WriteRegister(0x5E, 0x8C);
     System::Delay(80);
+
+    // Run mode step 2: Lock baseline tracking completely (CL = 00)
+    // Disables hardware baseline adaptation and auto-reconfiguration so touching all pads
+    // simultaneously never re-baselines over touched fingers, eliminating stuck pads!
+    WriteRegister(0x5E, 0x0C);
 }
 
 void Pads::Process() {
