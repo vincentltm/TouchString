@@ -3,7 +3,7 @@
 Polyphonic physical modeling string synthesizer for the Synthux Touch synthesizer and Daisy Seed.
 
 ## Quick Install
-Flash the precompiled [**TouchString.bin** (v2.0.0)](https://github.com/vincentltm/TouchString/releases/download/v2.0.0/TouchString.bin) directly using the [Daisy Seed web programmer](https://flash.daisy.audio/).
+Flash the precompiled [**TouchString.bin** (v2.1.0)](https://github.com/vincentltm/TouchString/releases/download/v2.1.0/TouchString.bin) directly using the [Daisy Seed web programmer](https://flash.daisy.audio/).
 
 ## Controls
 
